@@ -82,11 +82,11 @@
             </svg>
         </button>
 
-        <!-- Add Medication Modal -->
+        <!-- Add / Edit Medication Modal -->
         <div class="modal" id="addMedicationModal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <h2>Add Medication</h2>
+                    <h2 id="medicationModalTitle">Add Medication</h2>
                     <button class="btn-close" id="closeMedicationModal">
                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                             <line x1="18" y1="6" x2="6" y2="18"/>
@@ -96,8 +96,8 @@
                 </div>
 
                 <div class="modal-body">
-                    <!-- Camera Option -->
-                    <div class="camera-section">
+                    <!-- Camera Option (hidden in edit mode) -->
+                    <div class="camera-section" id="cameraSectionWrapper">
                         <button class="btn-camera" id="cameraBtn">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
@@ -109,12 +109,13 @@
                         <div class="ocr-status" id="ocrStatus"></div>
                     </div>
 
-                    <div class="divider">
+                    <div class="divider" id="cameraDivider">
                         <span>or enter manually</span>
                     </div>
 
                     <!-- Medication Form -->
                     <form id="medicationForm">
+                        <input type="hidden" id="editMedId">
                         <div class="form-group">
                             <label for="medName">Medication Name *</label>
                             <input type="text" id="medName" required placeholder="e.g., Lisinopril">
@@ -150,7 +151,7 @@
 
                         <div class="form-actions">
                             <button type="button" class="btn btn-secondary" id="cancelMedicationBtn">Cancel</button>
-                            <button type="submit" class="btn btn-primary">Add Medication</button>
+                            <button type="submit" class="btn btn-primary" id="medicationSubmitBtn">Add Medication</button>
                         </div>
                     </form>
                 </div>

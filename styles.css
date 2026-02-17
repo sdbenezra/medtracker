@@ -570,6 +570,60 @@ body {
     border-color: var(--primary-400);
 }
 
+.btn-med-action.edit {
+    color: var(--gray-600);
+}
+
+.btn-med-action.edit:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-400);
+    color: var(--primary-600);
+}
+
+/* As-needed dose log list */
+.asneeded-log-list {
+    margin-top: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+}
+
+.asneeded-log-header {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+    margin-bottom: var(--spacing-xs);
+}
+
+.asneeded-log-entry {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: white;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: 0.875rem;
+    color: var(--text-primary);
+}
+
+.btn-remove-dose {
+    background: none;
+    border: none;
+    color: var(--gray-400);
+    font-size: 1.25rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 var(--spacing-xs);
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+}
+
+.btn-remove-dose:hover {
+    color: var(--error);
+    background: #fef2f2;
+}
+
 /* FAB */
 .fab {
     position: fixed;

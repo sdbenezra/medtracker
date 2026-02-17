@@ -83,6 +83,17 @@ class MedTrackStorage {
         return this.delete('medications', id);
     }
 
+    async updateMedication(medication) {
+        return new Promise((resolve, reject) => {
+            if (!this.db) { reject(new Error('Database not initialized')); return; }
+            const transaction = this.db.transaction('medications', 'readwrite');
+            const store = transaction.objectStore('medications');
+            const request = store.put(medication);
+            request.onsuccess = () => resolve();
+            request.onerror = () => reject(request.error);
+        });
+    }
+
     async exportData() {
         const people = await this.getPeople();
         const medications = await this.getMedications();
@@ -725,6 +736,12 @@ class MedTrackApp {
                         <div class="medication-dosage">${med.dosage} • ${frequencyText}</div>
                     </div>
                     <div class="medication-actions">
+                        <button class="btn-med-action edit" data-med-id="${med.id}" title="Edit">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                            </svg>
+                        </button>
                         <button class="btn-med-action history" data-med-id="${med.id}" title="View History">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <circle cx="12" cy="12" r="10"/>
@@ -747,8 +764,7 @@ class MedTrackApp {
                             <span class="dose-tracker-count">${todayLogs.length}/${med.times.length}</span>
                         </div>
                         <div class="dose-checkboxes">
-                            ${med.times.map((time, index) => {
-                                const logId = `${med.id}-${time}-${todayStr}`;
+                            ${med.times.map((time) => {
                                 const isTaken = todayLogs.some(log => log.scheduledTime === time);
                                 const matchingLog = todayLogs.find(log => log.scheduledTime === time);
                                 return `
@@ -777,8 +793,20 @@ class MedTrackApp {
                             Log Dose Taken
                         </button>
                         ${todayLogs.length > 0 ? `
-                            <div class="asneeded-logs">
-                                Today: ${todayLogs.length} dose${todayLogs.length > 1 ? 's' : ''}
+                            <div class="asneeded-log-list">
+                                <div class="asneeded-log-header">Today's doses (tap × to remove)</div>
+                                ${todayLogs.map(log => `
+                                    <div class="asneeded-log-entry">
+                                        <span>
+                                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:0.875rem;height:0.875rem;vertical-align:-2px;margin-right:0.25rem;">
+                                                <circle cx="12" cy="12" r="10"/>
+                                                <polyline points="12 6 12 12 16 14"/>
+                                            </svg>
+                                            ${this.formatTimestamp(log.timestamp)}
+                                        </span>
+                                        <button class="btn-remove-dose" data-log-id="${log.id}" title="Remove this dose">×</button>
+                                    </div>
+                                `).join('')}
                             </div>
                         ` : ''}
                     </div>
@@ -788,6 +816,12 @@ class MedTrackApp {
                     <div class="medication-notes">${med.notes}</div>
                 ` : ''}
             `;
+
+            // Edit button
+            const editBtn = card.querySelector('.btn-med-action.edit');
+            editBtn?.addEventListener('click', () => {
+                this.openEditModal(med);
+            });
 
             // Delete button
             const deleteBtn = card.querySelector('.btn-med-action.delete');
@@ -817,6 +851,17 @@ class MedTrackApp {
             const logDoseBtn = card.querySelector('.btn-log-dose');
             logDoseBtn?.addEventListener('click', async () => {
                 await this.logAsNeededDose(med.id);
+            });
+
+            // Remove individual as-needed dose entries
+            const removeDoseBtns = card.querySelectorAll('.btn-remove-dose');
+            removeDoseBtns.forEach(btn => {
+                btn.addEventListener('click', async () => {
+                    const logId = btn.dataset.logId;
+                    await this.storage.deleteDoseLog(logId);
+                    this.doseLogs = this.doseLogs.filter(log => log.id !== logId);
+                    this.render();
+                });
             });
 
             this.medicationsList.appendChild(card);
@@ -906,36 +951,74 @@ class MedTrackApp {
         this.render();
     }
 
+    openEditModal(med) {
+        // Switch modal to edit mode
+        document.getElementById('medicationModalTitle').textContent = 'Edit Medication';
+        document.getElementById('medicationSubmitBtn').textContent = 'Save Changes';
+        document.getElementById('editMedId').value = med.id;
+        document.getElementById('cameraSectionWrapper').style.display = 'none';
+        document.getElementById('cameraDivider').style.display = 'none';
+
+        // Pre-fill fields
+        document.getElementById('medName').value = med.name;
+        document.getElementById('medDosage').value = med.dosage;
+        this.frequencySelect.value = med.frequency;
+        document.getElementById('medNotes').value = med.notes || '';
+
+        // Build time inputs with existing values
+        this.updateTimeInputs();
+        if (med.frequency !== 'asneeded' && med.times.length > 0) {
+            const timeInputEls = this.timeInputsContainer.querySelectorAll('input[type="time"]');
+            med.times.forEach((t, i) => {
+                if (timeInputEls[i]) timeInputEls[i].value = t;
+            });
+        }
+
+        this.openModal(this.addMedicationModal);
+    }
+
     async handleAddMedication() {
         if (!this.currentPersonId) return;
 
+        const editId = document.getElementById('editMedId').value;
         const nameInput = document.getElementById('medName');
         const dosageInput = document.getElementById('medDosage');
         const notesInput = document.getElementById('medNotes');
 
         const times = [];
         const timeInputs = this.timeInputsContainer.querySelectorAll('input[type="time"]');
-        timeInputs.forEach(input => {
-            times.push(input.value);
-        });
+        timeInputs.forEach(input => times.push(input.value));
 
-        const medication = {
-            id: this.generateId(),
-            personId: this.currentPersonId,
-            name: nameInput.value.trim(),
-            dosage: dosageInput.value.trim(),
-            frequency: this.frequencySelect.value,
-            times: times,
-            notes: notesInput.value.trim() || undefined
-        };
+        if (editId) {
+            // --- EDIT existing medication ---
+            const existing = this.medications.find(m => m.id === editId);
+            if (!existing) return;
 
-        await this.storage.addMedication(medication);
-        this.medications.push(medication);
+            existing.name     = nameInput.value.trim();
+            existing.dosage   = dosageInput.value.trim();
+            existing.frequency = this.frequencySelect.value;
+            existing.times    = times;
+            existing.notes    = notesInput.value.trim() || undefined;
 
-        // Schedule notifications
-        const person = this.people.find(p => p.id === this.currentPersonId);
-        if (person) {
-            this.notifications.scheduleReminder(medication, person);
+            await this.storage.updateMedication(existing);
+        } else {
+            // --- ADD new medication ---
+            const medication = {
+                id: this.generateId(),
+                personId: this.currentPersonId,
+                name: nameInput.value.trim(),
+                dosage: dosageInput.value.trim(),
+                frequency: this.frequencySelect.value,
+                times,
+                notes: notesInput.value.trim() || undefined
+            };
+
+            await this.storage.addMedication(medication);
+            this.medications.push(medication);
+
+            // Schedule notifications
+            const person = this.people.find(p => p.id === this.currentPersonId);
+            if (person) this.notifications.scheduleReminder(medication, person);
         }
 
         this.medicationForm.reset();
@@ -1009,6 +1092,11 @@ class MedTrackApp {
         modal.classList.remove('show');
         if (modal === this.addMedicationModal) {
             this.medicationForm.reset();
+            document.getElementById('editMedId').value = '';
+            document.getElementById('medicationModalTitle').textContent = 'Add Medication';
+            document.getElementById('medicationSubmitBtn').textContent = 'Add Medication';
+            document.getElementById('cameraSectionWrapper').style.display = '';
+            document.getElementById('cameraDivider').style.display = '';
             const ocrStatus = document.getElementById('ocrStatus');
             ocrStatus.classList.remove('show');
         }
