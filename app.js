@@ -356,6 +356,7 @@ class MedTrackApp {
         this.importModal = document.getElementById('importModal');
         this.settingsModal = document.getElementById('settingsModal');
         this.welcomeModal = document.getElementById('welcomeModal');
+        this.backupHelpModal = document.getElementById('backupHelpModal');
         this.medicationForm = document.getElementById('medicationForm');
         this.personForm = document.getElementById('personForm');
         this.timeInputsContainer = document.getElementById('timeInputs');
@@ -405,6 +406,16 @@ class MedTrackApp {
 
         document.getElementById('resetAppBtn').addEventListener('click', () => {
             this.handleResetApp();
+        });
+
+        // Where's my backup help
+        document.getElementById('whereIsBackupBtn').addEventListener('click', () => {
+            this.closeModal(this.settingsModal);
+            this.openModal(this.backupHelpModal);
+        });
+
+        document.getElementById('closeBackupHelpModal').addEventListener('click', () => {
+            this.closeModal(this.backupHelpModal);
         });
 
         // FAB
@@ -513,7 +524,7 @@ class MedTrackApp {
         });
 
         // Close modals on background click
-        [this.addMedicationModal, this.addPersonModal, this.importModal, this.settingsModal].forEach(modal => {
+        [this.addMedicationModal, this.addPersonModal, this.importModal, this.settingsModal, this.backupHelpModal].forEach(modal => {
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     this.closeModal(modal);
