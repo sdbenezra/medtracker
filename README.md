@@ -5,7 +5,7 @@ A simple, privacy-focused medication tracking app that works entirely in your br
 ## Features
 
 ✅ **Multi-Person Support** - Track medications for multiple family members
-✅ **Flexible Scheduling** - Set any combination of days and times per medication
+✅ **Flexible Scheduling** - Daily, specific weekdays, every N weeks (up to 6), or monthly by date or named weekday
 ✅ **Apple Reminders Integration** - Share medications to Apple Reminders via the native share sheet
 ✅ **Dose Tracking** - Check off doses as you take them throughout the day
 ✅ **Offline Support** - Works without internet connection
@@ -99,15 +99,20 @@ medtrack/
 1. Click the + button
 2. Enter the medication name and dosage
 3. Choose **Scheduled** or **As needed**
-4. For scheduled medications, select which days and add one or more times
+4. For scheduled medications, choose a repeat pattern and add one or more times
 5. Add optional notes (e.g., "Take with food")
 
 ### Scheduling
 
-Each medication has a flexible schedule:
-- **Days** — pick any combination of days, or use "Every day" to select all
-- **Times** — add as many times as needed with the "+ Add time" button
-- **As needed** — for medications taken without a fixed schedule
+Each medication has a flexible repeat pattern:
+
+- **Every day** — taken daily at the selected times
+- **Days of the week** — pick any combination of days (e.g., Mon/Wed/Fri); weekday and weekend shorthands are detected automatically
+- **Every N weeks** — repeat every 2–6 weeks on selected days; the cycle anchors to the date the medication is first saved
+- **Monthly** — choose either a specific date of the month (1st–31st, ±1 day window in the dose tracker) or a named weekday occurrence such as "First Monday" or "Last Friday"
+- **As needed** — no fixed schedule; log doses manually as they're taken
+
+Add as many times per day as needed with the "+ Add time" button.
 
 ### Reminders via Apple Reminders
 
@@ -115,7 +120,7 @@ The app uses the native Web Share API to send medication details to Apple Remind
 
 1. Tap the share icon on any medication card
 2. Choose Reminders from the share sheet
-3. The medication name, dosage, days, and times are pre-filled
+3. The medication name, dosage, schedule, and times are pre-filled
 
 On desktop, a copy fallback is shown so you can paste the details wherever you need them.
 
