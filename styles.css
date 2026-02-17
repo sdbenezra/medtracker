@@ -1243,7 +1243,64 @@ body {
     font-weight: bold;
 }
 
-/* Backup Help Modal */
+/* Day of week picker */
+.day-picker {
+    display: flex;
+    gap: var(--spacing-sm);
+    flex-wrap: wrap;
+}
+
+.day-btn {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.25rem;
+    cursor: pointer;
+    font-size: 0.75rem;
+    font-weight: 600;
+    color: var(--text-secondary);
+    user-select: none;
+}
+
+.day-btn input[type="checkbox"] {
+    appearance: none;
+    -webkit-appearance: none;
+    width: 2.25rem;
+    height: 2.25rem;
+    border: 2px solid var(--border);
+    border-radius: 50%;
+    background: var(--bg-primary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all var(--transition-fast);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.day-btn input[type="checkbox"]:checked {
+    background: var(--primary-600);
+    border-color: var(--primary-600);
+}
+
+.day-btn input[type="checkbox"]:checked + span,
+.day-btn:has(input:checked) {
+    color: var(--primary-600);
+}
+
+/* Not scheduled today indicator */
+.dose-not-today {
+    background: var(--gray-50) !important;
+    border: 1px dashed var(--border) !important;
+    padding: var(--spacing-md) !important;
+}
+
+.dose-not-today-msg {
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-style: italic;
+}
 .help-section {
     margin-bottom: var(--spacing-xl);
     padding: var(--spacing-lg);

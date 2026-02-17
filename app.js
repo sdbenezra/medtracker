@@ -362,12 +362,16 @@ class ReminderManager {
     async shareMedication(medication, person) {
         const times = medication.times.map(t => this.formatTime(t)).join(', ');
         const personLabel = person.name !== 'Me' ? ` for ${person.name}` : '';
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const dayLabel = medication.days && medication.days.length > 0
+            ? `\nDays: ${medication.days.sort((a,b)=>a-b).map(d => dayNames[d]).join(', ')}`
+            : '';
 
         let text;
         if (medication.frequency === 'asneeded') {
             text = `💊 ${medication.name} ${medication.dosage}${personLabel}\nTake as needed${medication.notes ? '\n' + medication.notes : ''}`;
         } else {
-            text = `💊 ${medication.name} ${medication.dosage}${personLabel}\nDaily at: ${times}${medication.notes ? '\n' + medication.notes : ''}`;
+            text = `💊 ${medication.name} ${medication.dosage}${personLabel}${dayLabel}\nAt: ${times}${medication.notes ? '\n' + medication.notes : ''}`;
         }
 
         if (this.canShare()) {
@@ -759,7 +763,7 @@ class MedTrackApp {
             const card = document.createElement('div');
             card.className = 'medication-card';
 
-            const frequencyText = this.getFrequencyText(med.frequency);
+            const frequencyText = this.getFrequencyText(med.frequency, med.days);
 
             // Get today's dose logs for this medication
             const today = new Date();
@@ -812,34 +816,60 @@ class MedTrackApp {
                     </div>
                 </div>
                 
-                ${med.frequency !== 'asneeded' ? `
-                    <div class="dose-tracker">
-                        <div class="dose-tracker-header">
-                            <span class="dose-tracker-title">Today's Doses</span>
-                            <span class="dose-tracker-count">${todayLogs.length}/${med.times.length}</span>
+                ${med.frequency !== 'asneeded' ? (() => {
+                    const isWeekly = ['weekly1','weekly2','weekly3','weekly5','everyother','specificdays'].includes(med.frequency);
+                    const todayDow = new Date().getDay(); // 0=Sun … 6=Sat
+                    const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+                    // For every-other-day: check if today is a scheduled day based on dose history
+                    // We treat it as always eligible (user decides)
+                    const scheduledToday = !isWeekly
+                        || med.frequency === 'everyother'
+                        || (med.days && med.days.includes(todayDow));
+
+                    if (!scheduledToday) {
+                        const nextDays = med.days
+                            ? med.days.filter(d => d > todayDow).concat(med.days.filter(d => d <= todayDow))
+                            : [];
+                        const nextDay = nextDays.length > 0 ? dayNames[nextDays[0]] : '';
+                        return `
+                            <div class="dose-tracker dose-not-today">
+                                <span class="dose-not-today-msg">
+                                    Not scheduled today${nextDay ? ` · Next: ${nextDay}` : ''}
+                                </span>
+                            </div>
+                        `;
+                    }
+
+                    return `
+                        <div class="dose-tracker">
+                            <div class="dose-tracker-header">
+                                <span class="dose-tracker-title">Today's Doses</span>
+                                <span class="dose-tracker-count">${todayLogs.length}/${med.times.length}</span>
+                            </div>
+                            <div class="dose-checkboxes">
+                                ${med.times.map((time) => {
+                                    const isTaken = todayLogs.some(log => log.scheduledTime === time);
+                                    const matchingLog = todayLogs.find(log => log.scheduledTime === time);
+                                    return `
+                                        <label class="dose-checkbox ${isTaken ? 'checked' : ''}">
+                                            <input type="checkbox"
+                                                   data-med-id="${med.id}"
+                                                   data-time="${time}"
+                                                   data-log-id="${matchingLog ? matchingLog.id : ''}"
+                                                   ${isTaken ? 'checked' : ''}>
+                                            <span class="checkbox-custom"></span>
+                                            <span class="dose-time">${this.formatTime(time)}</span>
+                                            ${isTaken && matchingLog ? `
+                                                <span class="dose-taken-time">✓ ${this.formatTimestamp(matchingLog.timestamp)}</span>
+                                            ` : ''}
+                                        </label>
+                                    `;
+                                }).join('')}
+                            </div>
                         </div>
-                        <div class="dose-checkboxes">
-                            ${med.times.map((time) => {
-                                const isTaken = todayLogs.some(log => log.scheduledTime === time);
-                                const matchingLog = todayLogs.find(log => log.scheduledTime === time);
-                                return `
-                                    <label class="dose-checkbox ${isTaken ? 'checked' : ''}">
-                                        <input type="checkbox" 
-                                               data-med-id="${med.id}" 
-                                               data-time="${time}" 
-                                               data-log-id="${matchingLog ? matchingLog.id : ''}"
-                                               ${isTaken ? 'checked' : ''}>
-                                        <span class="checkbox-custom"></span>
-                                        <span class="dose-time">${this.formatTime(time)}</span>
-                                        ${isTaken && matchingLog ? `
-                                            <span class="dose-taken-time">✓ ${this.formatTimestamp(matchingLog.timestamp)}</span>
-                                        ` : ''}
-                                    </label>
-                                `;
-                            }).join('')}
-                        </div>
-                    </div>
-                ` : `
+                    `;
+                })() : `
                     <div class="dose-tracker">
                         <button class="btn-log-dose" data-med-id="${med.id}">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
@@ -935,33 +965,57 @@ class MedTrackApp {
 
     updateTimeInputs() {
         const frequency = this.frequencySelect.value;
-        let count = 0;
+        const timesContainer = document.getElementById('timesContainer');
+        const daysContainer = document.getElementById('daysContainer');
+        const isWeekly = ['weekly1','weekly2','weekly3','weekly5','everyother','specificdays'].includes(frequency);
+        const isSpecificDays = frequency === 'specificdays';
 
+        // Show/hide day picker
+        daysContainer.style.display = isWeekly ? 'block' : 'none';
+
+        // For specificdays let user pick freely; for other weekly options pre-check sensible defaults
+        if (isWeekly && !isSpecificDays) {
+            const checks = daysContainer.querySelectorAll('input[type="checkbox"]');
+            const defaults = {
+                weekly1: [1],          // Mon
+                weekly2: [1, 4],       // Mon, Thu
+                weekly3: [1, 3, 5],    // Mon, Wed, Fri
+                weekly5: [1,2,3,4,5],  // Mon–Fri
+                everyother: []         // user can leave blank — we'll note it's every other day
+            };
+            checks.forEach(cb => {
+                cb.checked = (defaults[frequency] || []).includes(Number(cb.value));
+            });
+        }
+
+        let count = 0;
         switch (frequency) {
-            case 'once': count = 1; break;
-            case 'twice': count = 2; break;
-            case 'three': count = 3; break;
-            case 'four': count = 4; break;
-            case 'asneeded': count = 0; break;
+            case 'once':        count = 1; break;
+            case 'twice':       count = 2; break;
+            case 'three':       count = 3; break;
+            case 'four':        count = 4; break;
+            case 'weekly1':
+            case 'weekly2':
+            case 'weekly3':
+            case 'weekly5':
+            case 'everyother':
+            case 'specificdays': count = 1; break;
+            case 'asneeded':    count = 0; break;
         }
 
         this.timeInputsContainer.innerHTML = '';
 
         if (count === 0) {
-            const container = document.getElementById('timesContainer');
-            container.style.display = 'none';
+            timesContainer.style.display = 'none';
             return;
         }
 
-        const container = document.getElementById('timesContainer');
-        container.style.display = 'block';
+        timesContainer.style.display = 'block';
 
         for (let i = 0; i < count; i++) {
             const row = document.createElement('div');
             row.className = 'time-input-row';
-
             const defaultTime = this.getDefaultTime(i, count);
-
             row.innerHTML = `
                 <input type="time" value="${defaultTime}" required>
                 ${count > 1 ? `
@@ -973,14 +1027,8 @@ class MedTrackApp {
                     </button>
                 ` : ''}
             `;
-
             const removeBtn = row.querySelector('.btn-remove-time');
-            if (removeBtn) {
-                removeBtn.addEventListener('click', () => {
-                    row.remove();
-                });
-            }
-
+            if (removeBtn) removeBtn.addEventListener('click', () => row.remove());
             this.timeInputsContainer.appendChild(row);
         }
     }
@@ -1039,6 +1087,14 @@ class MedTrackApp {
             });
         }
 
+        // Restore day checkboxes
+        if (med.days && med.days.length > 0) {
+            const checks = document.querySelectorAll('#daysContainer input[type="checkbox"]');
+            checks.forEach(cb => {
+                cb.checked = med.days.includes(Number(cb.value));
+            });
+        }
+
         this.openModal(this.addMedicationModal);
     }
 
@@ -1054,16 +1110,22 @@ class MedTrackApp {
         const timeInputs = this.timeInputsContainer.querySelectorAll('input[type="time"]');
         timeInputs.forEach(input => times.push(input.value));
 
+        // Collect selected days (for weekly/specific-day frequencies)
+        const days = [];
+        const dayChecks = document.querySelectorAll('#daysContainer input[type="checkbox"]:checked');
+        dayChecks.forEach(cb => days.push(Number(cb.value)));
+
         if (editId) {
             // --- EDIT existing medication ---
             const existing = this.medications.find(m => m.id === editId);
             if (!existing) return;
 
-            existing.name     = nameInput.value.trim();
-            existing.dosage   = dosageInput.value.trim();
+            existing.name      = nameInput.value.trim();
+            existing.dosage    = dosageInput.value.trim();
             existing.frequency = this.frequencySelect.value;
-            existing.times    = times;
-            existing.notes    = notesInput.value.trim() || undefined;
+            existing.times     = times;
+            existing.days      = days;
+            existing.notes     = notesInput.value.trim() || undefined;
 
             await this.storage.updateMedication(existing);
         } else {
@@ -1075,6 +1137,7 @@ class MedTrackApp {
                 dosage: dosageInput.value.trim(),
                 frequency: this.frequencySelect.value,
                 times,
+                days,
                 notes: notesInput.value.trim() || undefined
             };
 
@@ -1158,6 +1221,8 @@ class MedTrackApp {
             document.getElementById('medicationSubmitBtn').textContent = 'Add Medication';
             document.getElementById('cameraSectionWrapper').style.display = '';
             document.getElementById('cameraDivider').style.display = '';
+            document.getElementById('daysContainer').style.display = 'none';
+            document.querySelectorAll('#daysContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
             const ocrStatus = document.getElementById('ocrStatus');
             ocrStatus.classList.remove('show');
         }
@@ -1166,13 +1231,24 @@ class MedTrackApp {
         }
     }
 
-    getFrequencyText(frequency) {
+    getFrequencyText(frequency, days) {
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const dayList = days && days.length > 0
+            ? days.sort((a,b) => a-b).map(d => dayNames[d]).join(', ')
+            : null;
+
         const map = {
-            once: 'Once daily',
-            twice: 'Twice daily',
-            three: '3 times daily',
-            four: '4 times daily',
-            asneeded: 'As needed'
+            once:        'Once daily',
+            twice:       'Twice daily',
+            three:       '3× daily',
+            four:        '4× daily',
+            weekly1:     dayList ? `Weekly (${dayList})` : 'Once a week',
+            weekly2:     dayList ? `2×/week (${dayList})` : 'Twice a week',
+            weekly3:     dayList ? `3×/week (${dayList})` : '3× a week',
+            weekly5:     dayList ? `5×/week (${dayList})` : '5× a week',
+            everyother:  'Every other day',
+            specificdays: dayList ? `${dayList}` : 'Specific days',
+            asneeded:    'As needed'
         };
         return map[frequency] || frequency;
     }
@@ -1248,7 +1324,7 @@ class MedTrackApp {
         let historyHTML = `
             <div class="history-header">
                 <h3>${med.name} - Last 7 Days</h3>
-                <p class="history-subtitle">${med.dosage} • ${this.getFrequencyText(med.frequency)}</p>
+                <p class="history-subtitle">${med.dosage} • ${this.getFrequencyText(med.frequency, med.days)}</p>
             </div>
         `;
 
