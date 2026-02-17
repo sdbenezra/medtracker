@@ -5,13 +5,13 @@ A simple, privacy-focused medication tracking app that works entirely in your br
 ## Features
 
 ✅ **Multi-Person Support** - Track medications for multiple family members
-✅ **OCR Scanning** - Take a photo of medication bottles to auto-fill information
-✅ **Medication Reminders** - Browser notifications for scheduled doses
+✅ **Flexible Scheduling** - Set any combination of days and times per medication
+✅ **Apple Reminders Integration** - Share medications to Apple Reminders via the native share sheet
+✅ **Dose Tracking** - Check off doses as you take them throughout the day
 ✅ **Offline Support** - Works without internet connection
 ✅ **Data Export/Import** - Backup and restore your data as JSON with timestamped filenames
 ✅ **Auto-Backup Reminders** - Optional 30-day backup reminders to prevent data loss
 ✅ **Privacy First** - All data stored locally on your device
-✅ **Data Persistence Warning** - Welcome screen explains data storage limitations
 ✅ **Complete Data Reset** - Securely delete all data when needed
 ✅ **Settings Panel** - Centralized management for all app features
 ✅ **Mobile Friendly** - Install as a PWA on your phone
@@ -22,8 +22,6 @@ A simple, privacy-focused medication tracking app that works entirely in your br
 
 1. Simply open `index.html` in a modern web browser
 2. That's it! No build step required.
-
-**Important for Existing Users:** If you're updating from a previous version, you may need to refresh the page or clear your browser cache for new features to work properly. The database will automatically upgrade to support dose tracking.
 
 For best experience, use a local server:
 
@@ -99,26 +97,31 @@ medtrack/
 ### Adding Medications
 
 1. Click the + button
-2. Either scan a medication label with your camera or enter manually
-3. Set dosage, frequency, and schedule times
-4. Add optional notes (e.g., "Take with food")
+2. Enter the medication name and dosage
+3. Choose **Scheduled** or **As needed**
+4. For scheduled medications, select which days and add one or more times
+5. Add optional notes (e.g., "Take with food")
 
-### Scanning Medications
+### Scheduling
 
-The OCR feature uses Tesseract.js to extract information from medication labels. For best results:
-- Take clear, well-lit photos
-- Ensure text is straight and in focus
-- Review and correct extracted information
+Each medication has a flexible schedule:
+- **Days** — pick any combination of days, or use "Every day" to select all
+- **Times** — add as many times as needed with the "+ Add time" button
+- **As needed** — for medications taken without a fixed schedule
 
-### Reminders
+### Reminders via Apple Reminders
 
-The app uses browser notifications. You'll be asked for permission on first use. 
+The app uses the native Web Share API to send medication details to Apple Reminders (iOS) or any other app that accepts shared text. To set up a reminder:
 
-**Note:** Browser notifications work differently on mobile:
-- **iOS**: Reminders only work when app is open
-- **Android**: Full notification support via PWA
+1. Tap the share icon on any medication card
+2. Choose Reminders from the share sheet
+3. The medication name, dosage, days, and times are pre-filled
 
-For production-grade reminders, consider integrating with a backend service.
+On desktop, a copy fallback is shown so you can paste the details wherever you need them.
+
+### Dose Tracking
+
+Each scheduled medication shows checkboxes for its times of day. Check them off as doses are taken — the state resets automatically at midnight. Medications not scheduled for today show a "not today" indicator with the next scheduled day.
 
 ### Data Export/Import
 
@@ -132,7 +135,7 @@ Your data is stored in IndexedDB and persists across sessions.
 Access settings via the gear icon to:
 - **Export/Import data** - Manage your backups
 - **Auto-backup reminders** - Toggle 30-day backup reminders
-- **Notification settings** - Enable/check medication reminders
+- **Share all medications** - Send your full medication list via the share sheet
 - **Reset app** - Completely delete all data (requires double confirmation)
 
 ### Welcome Screen
@@ -141,7 +144,6 @@ First-time users see a welcome screen that:
 - Explains local-only data storage
 - Warns about data persistence limitations
 - Recommends regular backups
-- Highlights the importance of exporting data
 
 This screen only shows once and can be bypassed for returning users.
 
@@ -219,17 +221,16 @@ The in-app reset is safer as it only deletes medication data while preserving br
 
 ## Limitations
 
-- OCR accuracy varies with image quality
-- Notifications reset on browser/device restart (use backend for persistent reminders)
-- IndexedDB storage can be cleared by browser (always maintain backups)
+- IndexedDB storage can be cleared by the browser (always maintain backups)
+- Web Share API is supported on iOS Safari and Android Chrome; desktop browsers show a copy fallback
+- Dose check-off state is in-memory and resets if the page is force-closed before midnight
 
 ## Future Enhancements
 
 Potential improvements you could add:
-- Medication history tracking
+- VLM-based label scanning for automatic medication entry
 - Refill reminders
 - Drug interaction checking
-- Barcode scanning
 - Cloud sync (requires backend)
 
 ## License

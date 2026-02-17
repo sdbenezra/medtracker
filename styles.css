@@ -106,6 +106,7 @@ body {
     position: sticky;
     top: 0;
     z-index: 40;
+    padding-top: env(safe-area-inset-top);
 }
 
 .header-content {
