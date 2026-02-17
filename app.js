@@ -462,39 +462,47 @@ class MedTrackApp {
     }
 
     attachEventListeners() {
+        // Null-safe helper — silently skips if the element doesn't exist
+        // (guards against stale cached HTML serving against newer JS)
+        const on = (id, event, fn, opts) => {
+            const el = document.getElementById(id);
+            if (el) el.addEventListener(event, fn, opts);
+            else console.warn(`[MedTrack] element #${id} not found — skipping listener`);
+        };
+
         // Welcome Modal
-        document.getElementById('getStartedBtn').addEventListener('click', async () => {
+        on('getStartedBtn', 'click', async () => {
             await this.storage.updateSetting('hasSeenWelcome', true);
             this.closeModal(this.welcomeModal);
         });
 
         // Settings Button
-        document.getElementById('settingsBtn').addEventListener('click', () => {
+        on('settingsBtn', 'click', () => {
             this.openSettingsModal();
         });
 
-        document.getElementById('closeSettingsModal').addEventListener('click', () => {
+        on('closeSettingsModal', 'click', () => {
             this.closeModal(this.settingsModal);
         });
 
         // Settings actions
-        document.getElementById('exportFromSettings').addEventListener('click', () => {
+        on('exportFromSettings', 'click', () => {
             this.handleExport();
         });
 
-        document.getElementById('importFromSettings').addEventListener('click', () => {
+        on('importFromSettings', 'click', () => {
             this.closeModal(this.settingsModal);
             this.openModal(this.importModal);
         });
 
-        document.getElementById('backupReminderToggle').addEventListener('change', async (e) => {
+        on('backupReminderToggle', 'change', async (e) => {
             await this.storage.updateSetting('backupReminder', e.target.checked);
             if (e.target.checked) {
                 await this.storage.updateSetting('lastBackupReminder', Date.now());
             }
         });
 
-        document.getElementById('shareAllRemindersBtn').addEventListener('click', async () => {
+        on('shareAllRemindersBtn', 'click', async () => {
             const currentMeds = this.medications.filter(m => m.personId === this.currentPersonId);
             const person = this.people.find(p => p.id === this.currentPersonId);
             if (!currentMeds.length) {
@@ -507,22 +515,22 @@ class MedTrackApp {
             }
         });
 
-        document.getElementById('resetAppBtn').addEventListener('click', () => {
+        on('resetAppBtn', 'click', () => {
             this.handleResetApp();
         });
 
         // Where's my backup help
-        document.getElementById('whereIsBackupBtn').addEventListener('click', () => {
+        on('whereIsBackupBtn', 'click', () => {
             this.closeModal(this.settingsModal);
             this.openModal(this.backupHelpModal);
         });
 
-        document.getElementById('closeBackupHelpModal').addEventListener('click', () => {
+        on('closeBackupHelpModal', 'click', () => {
             this.closeModal(this.backupHelpModal);
         });
 
         // FAB
-        document.getElementById('fabBtn').addEventListener('click', () => {
+        on('fabBtn', 'click', () => {
             if (!this.currentPersonId) {
                 alert('Please add a person first');
                 this.openModal(this.addPersonModal);
@@ -532,7 +540,7 @@ class MedTrackApp {
         });
 
         // Add Person Button
-        document.getElementById('addPersonBtn').addEventListener('click', () => {
+        on('addPersonBtn', 'click', () => {
             this.openModal(this.addPersonModal);
         });
 
@@ -542,11 +550,11 @@ class MedTrackApp {
             this.handleAddPerson();
         });
 
-        document.getElementById('cancelPersonBtn').addEventListener('click', () => {
+        on('cancelPersonBtn', 'click', () => {
             this.closeModal(this.addPersonModal);
         });
 
-        document.getElementById('closePersonModal').addEventListener('click', () => {
+        on('closePersonModal', 'click', () => {
             this.closeModal(this.addPersonModal);
         });
 
@@ -556,11 +564,11 @@ class MedTrackApp {
             this.handleAddMedication();
         });
 
-        document.getElementById('cancelMedicationBtn').addEventListener('click', () => {
+        on('cancelMedicationBtn', 'click', () => {
             this.closeModal(this.addMedicationModal);
         });
 
-        document.getElementById('closeMedicationModal').addEventListener('click', () => {
+        on('closeMedicationModal', 'click', () => {
             this.closeModal(this.addMedicationModal);
         });
 
@@ -611,7 +619,7 @@ class MedTrackApp {
         fileInput.addEventListener('change', handleImageFile);
 
         // Export (click)
-        document.getElementById('exportBtn').addEventListener('click', () => {
+        on('exportBtn', 'click', () => {
             this.handleExport();
         });
 
@@ -632,27 +640,30 @@ class MedTrackApp {
         };
 
         const exportBtn = document.getElementById('exportBtn');
-        exportBtn.addEventListener('mousedown', startLongPress);
-        exportBtn.addEventListener('mouseup', cancelLongPress);
-        exportBtn.addEventListener('mouseleave', cancelLongPress);
-        exportBtn.addEventListener('touchstart', (e) => { startLongPress(); }, { passive: true });
-        exportBtn.addEventListener('touchend', cancelLongPress);
-        exportBtn.addEventListener('touchcancel', cancelLongPress);
+        if (exportBtn) {
+            exportBtn.addEventListener('mousedown', startLongPress);
+            exportBtn.addEventListener('mouseup', cancelLongPress);
+            exportBtn.addEventListener('mouseleave', cancelLongPress);
+            exportBtn.addEventListener('touchstart', (e) => { startLongPress(); }, { passive: true });
+            exportBtn.addEventListener('touchend', cancelLongPress);
+            exportBtn.addEventListener('touchcancel', cancelLongPress);
+        }
 
-        document.getElementById('confirmImportBtn').addEventListener('click', () => {
+        on('confirmImportBtn', 'click', () => {
             this.handleImport();
         });
 
-        document.getElementById('cancelImportBtn').addEventListener('click', () => {
+        on('cancelImportBtn', 'click', () => {
             this.closeModal(this.importModal);
         });
 
-        document.getElementById('closeImportModal').addEventListener('click', () => {
+        on('closeImportModal', 'click', () => {
             this.closeModal(this.importModal);
         });
 
         // Close modals on background click
         [this.addMedicationModal, this.addPersonModal, this.importModal, this.settingsModal, this.backupHelpModal].forEach(modal => {
+            if (!modal) return;
             modal.addEventListener('click', (e) => {
                 if (e.target === modal) {
                     this.closeModal(modal);
@@ -748,7 +759,9 @@ class MedTrackApp {
     }
 
     renderMedications() {
-        const currentMeds = this.medications.filter(m => m.personId === this.currentPersonId);
+        const currentMeds = this.medications
+            .filter(m => m.personId === this.currentPersonId)
+            .sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 
         if (currentMeds.length === 0) {
             this.emptyState.classList.add('show');
@@ -757,11 +770,13 @@ class MedTrackApp {
         }
 
         this.emptyState.classList.remove('show');
+        if (this._dragCleanup) { this._dragCleanup(); this._dragCleanup = null; }
         this.medicationsList.innerHTML = '';
 
         currentMeds.forEach(med => {
             const card = document.createElement('div');
             card.className = 'medication-card';
+            card.dataset.medId = med.id;
 
             const frequencyText = this.getFrequencyText(med.frequency, med.days);
 
@@ -783,6 +798,13 @@ class MedTrackApp {
 
             card.innerHTML = `
                 <div class="medication-header">
+                    <div class="drag-handle" title="Drag to reorder">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <line x1="8" y1="6" x2="16" y2="6"/>
+                            <line x1="8" y1="12" x2="16" y2="12"/>
+                            <line x1="8" y1="18" x2="16" y2="18"/>
+                        </svg>
+                    </div>
                     <div class="medication-info">
                         <h3>${med.name}</h3>
                         <div class="medication-dosage">${med.dosage} • ${frequencyText}</div>
@@ -961,6 +983,99 @@ class MedTrackApp {
 
             this.medicationsList.appendChild(card);
         });
+
+        this.initDragAndDrop();
+    }
+
+    initDragAndDrop() {
+        const list = this.medicationsList;
+        let dragState = null;
+
+        const getCardAt = (x, y) => {
+            for (const card of list.querySelectorAll('.medication-card:not(.dragging)')) {
+                const rect = card.getBoundingClientRect();
+                if (y >= rect.top && y <= rect.bottom) return card;
+            }
+            return null;
+        };
+
+        const onStart = (handle, e) => {
+            const card = handle.closest('.medication-card');
+            if (!card) return;
+            e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            const rect = card.getBoundingClientRect();
+
+            const ghost = card.cloneNode(true);
+            ghost.className = 'medication-card drag-ghost';
+            ghost.style.cssText = [
+                'position:fixed',
+                'top:' + rect.top + 'px',
+                'left:' + rect.left + 'px',
+                'width:' + rect.width + 'px',
+                'z-index:1000',
+                'pointer-events:none',
+                'box-shadow:0 8px 32px rgba(0,0,0,0.18)',
+                'opacity:0.95',
+                'transform:scale(1.02) rotate(1deg)',
+                'transition:transform 0.1s'
+            ].join(';');
+            document.body.appendChild(ghost);
+            card.classList.add('dragging');
+
+            dragState = { card, ghost, offsetX: clientX - rect.left, offsetY: clientY - rect.top };
+        };
+
+        const onMove = (e) => {
+            if (!dragState) return;
+            e.preventDefault();
+            const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+            const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+            dragState.ghost.style.top  = (clientY - dragState.offsetY) + 'px';
+            dragState.ghost.style.left = (clientX - dragState.offsetX) + 'px';
+            const target = getCardAt(clientX, clientY);
+            if (target && target !== dragState.card) {
+                const targetRect = target.getBoundingClientRect();
+                if (clientY > targetRect.top + targetRect.height / 2) {
+                    target.after(dragState.card);
+                } else {
+                    target.before(dragState.card);
+                }
+            }
+        };
+
+        const onEnd = async () => {
+            if (!dragState) return;
+            dragState.ghost.remove();
+            dragState.card.classList.remove('dragging');
+            const newOrder = [...list.querySelectorAll('.medication-card')];
+            const updates = newOrder.map((el, i) => {
+                const med = this.medications.find(m => m.id === el.dataset.medId);
+                if (med) med.sortOrder = i;
+                return med;
+            }).filter(Boolean);
+            await Promise.all(updates.map(m => this.storage.updateMedication(m)));
+            dragState = null;
+        };
+
+        list.querySelectorAll('.drag-handle').forEach(handle => {
+            handle.addEventListener('mousedown', e => onStart(handle, e));
+            handle.addEventListener('touchstart', e => onStart(handle, e), { passive: false });
+        });
+
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('mouseup', onEnd);
+        document.addEventListener('touchend', onEnd);
+
+        if (this._dragCleanup) this._dragCleanup();
+        this._dragCleanup = () => {
+            document.removeEventListener('mousemove', onMove);
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('mouseup', onEnd);
+            document.removeEventListener('touchend', onEnd);
+        };
     }
 
     updateTimeInputs() {
@@ -1130,6 +1245,10 @@ class MedTrackApp {
             await this.storage.updateMedication(existing);
         } else {
             // --- ADD new medication ---
+            // Assign sortOrder as one past the current last for this person
+            const personMeds = this.medications.filter(m => m.personId === this.currentPersonId);
+            const maxOrder = personMeds.reduce((max, m) => Math.max(max, m.sortOrder ?? 0), 0);
+
             const medication = {
                 id: this.generateId(),
                 personId: this.currentPersonId,
@@ -1138,6 +1257,7 @@ class MedTrackApp {
                 frequency: this.frequencySelect.value,
                 times,
                 days,
+                sortOrder: maxOrder + 1,
                 notes: notesInput.value.trim() || undefined
             };
 
