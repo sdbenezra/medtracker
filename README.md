@@ -23,6 +23,8 @@ A simple, privacy-focused medication tracking app that works entirely in your br
 1. Simply open `index.html` in a modern web browser
 2. That's it! No build step required.
 
+**Important for Existing Users:** If you're updating from a previous version, you may need to refresh the page or clear your browser cache for new features to work properly. The database will automatically upgrade to support dose tracking.
+
 For best experience, use a local server:
 
 ```bash
@@ -76,7 +78,6 @@ medtrack/
 ├── index.html          # Main HTML file
 ├── styles.css          # Styling
 ├── app.js              # Application logic
-├── app.ts              # TypeScript source (optional)
 ├── manifest.json       # PWA manifest
 ├── sw.js              # Service worker for PWA
 └── README.md          # This file
@@ -203,15 +204,6 @@ To completely reset the app, clear your browser's site data.
 The in-app reset is safer as it only deletes medication data while preserving browser settings.
 
 ## Development
-
-### TypeScript (Optional)
-
-The app is written in vanilla JavaScript for zero-config deployment, but TypeScript source is included:
-
-```bash
-npm install -g typescript
-tsc app.ts --outFile app.js --target ES2017 --lib ES2017,DOM
-```
 
 ### Customization
 

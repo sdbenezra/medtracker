@@ -2,34 +2,52 @@
 class MedTrackStorage {
     constructor() {
         this.dbName = 'MedTrackDB';
-        this.version = 1;
+        this.version = 2;
         this.db = null;
     }
 
     async init() {
         return new Promise((resolve, reject) => {
+            console.log('Initializing MedTrack database, version:', this.version);
             const request = indexedDB.open(this.dbName, this.version);
 
-            request.onerror = () => reject(request.error);
+            request.onerror = () => {
+                console.error('Database initialization error:', request.error);
+                reject(request.error);
+            };
+            
             request.onsuccess = () => {
                 this.db = request.result;
+                console.log('Database initialized successfully');
+                console.log('Available stores:', Array.from(this.db.objectStoreNames));
                 resolve();
             };
 
             request.onupgradeneeded = (event) => {
+                console.log('Database upgrade needed from version', event.oldVersion, 'to', event.newVersion);
                 const db = event.target.result;
                 
                 if (!db.objectStoreNames.contains('people')) {
+                    console.log('Creating people store');
                     db.createObjectStore('people', { keyPath: 'id' });
                 }
                 
                 if (!db.objectStoreNames.contains('medications')) {
+                    console.log('Creating medications store');
                     db.createObjectStore('medications', { keyPath: 'id' });
                 }
 
                 if (!db.objectStoreNames.contains('settings')) {
+                    console.log('Creating settings store');
                     db.createObjectStore('settings', { keyPath: 'id' });
                 }
+
+                if (!db.objectStoreNames.contains('doseLogs')) {
+                    console.log('Creating doseLogs store');
+                    db.createObjectStore('doseLogs', { keyPath: 'id' });
+                }
+                
+                console.log('Database upgrade complete');
             };
         });
     }
@@ -68,7 +86,8 @@ class MedTrackStorage {
     async exportData() {
         const people = await this.getPeople();
         const medications = await this.getMedications();
-        return { people, medications };
+        const doseLogs = await this.getDoseLogs();
+        return { people, medications, doseLogs };
     }
 
     async getSettings() {
@@ -112,12 +131,52 @@ class MedTrackStorage {
     async clearAllData() {
         await this.clearAll('people');
         await this.clearAll('medications');
+        await this.clearAll('doseLogs');
+    }
+
+    async getDoseLogs() {
+        try {
+            const logs = await this.getAll('doseLogs');
+            console.log('Retrieved dose logs:', logs.length);
+            return logs;
+        } catch (error) {
+            console.error('Error getting dose logs:', error);
+            return [];
+        }
+    }
+
+    async addDoseLog(doseLog) {
+        try {
+            console.log('Adding dose log:', doseLog);
+            const result = await this.add('doseLogs', doseLog);
+            console.log('Dose log added successfully');
+            return result;
+        } catch (error) {
+            console.error('Error adding dose log:', error);
+            throw error;
+        }
+    }
+
+    async deleteDoseLog(id) {
+        return this.delete('doseLogs', id);
+    }
+
+    async getLogsForMedication(medicationId) {
+        const allLogs = await this.getDoseLogs();
+        return allLogs.filter(log => log.medicationId === medicationId);
+    }
+
+    async getLogsForDate(date) {
+        const allLogs = await this.getDoseLogs();
+        const dateStr = new Date(date).toDateString();
+        return allLogs.filter(log => new Date(log.timestamp).toDateString() === dateStr);
     }
 
     async importData(data) {
         // Clear existing data
         await this.clearAll('people');
         await this.clearAll('medications');
+        await this.clearAll('doseLogs');
 
         // Import new data
         for (const person of data.people) {
@@ -125,6 +184,11 @@ class MedTrackStorage {
         }
         for (const medication of data.medications) {
             await this.addMedication(medication);
+        }
+        if (data.doseLogs) {
+            for (const log of data.doseLogs) {
+                await this.addDoseLog(log);
+            }
         }
     }
 
@@ -335,6 +399,7 @@ class MedTrackApp {
         this.currentPersonId = null;
         this.people = [];
         this.medications = [];
+        this.doseLogs = [];
     }
 
     async init() {
@@ -536,6 +601,7 @@ class MedTrackApp {
     async loadData() {
         this.people = await this.storage.getPeople();
         this.medications = await this.storage.getMedications();
+        this.doseLogs = await this.storage.getDoseLogs();
 
         // Check if user has seen welcome modal
         const hasSeenWelcome = await this.storage.getSetting('hasSeenWelcome');
@@ -636,6 +702,22 @@ class MedTrackApp {
 
             const frequencyText = this.getFrequencyText(med.frequency);
 
+            // Get today's dose logs for this medication
+            const today = new Date();
+            const todayStr = today.toDateString();
+            const todayLogs = this.doseLogs.filter(log => 
+                log.medicationId === med.id && 
+                new Date(log.timestamp).toDateString() === todayStr
+            );
+
+            // Get recent logs (last 7 days)
+            const sevenDaysAgo = new Date();
+            sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+            const recentLogs = this.doseLogs.filter(log => 
+                log.medicationId === med.id && 
+                new Date(log.timestamp) >= sevenDaysAgo
+            );
+
             card.innerHTML = `
                 <div class="medication-header">
                     <div class="medication-info">
@@ -643,7 +725,13 @@ class MedTrackApp {
                         <div class="medication-dosage">${med.dosage} • ${frequencyText}</div>
                     </div>
                     <div class="medication-actions">
-                        <button class="btn-med-action delete" data-med-id="${med.id}">
+                        <button class="btn-med-action history" data-med-id="${med.id}" title="View History">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"/>
+                                <polyline points="12 6 12 12 16 14"/>
+                            </svg>
+                        </button>
+                        <button class="btn-med-action delete" data-med-id="${med.id}" title="Delete">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <polyline points="3 6 5 6 21 6"/>
                                 <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
@@ -651,24 +739,57 @@ class MedTrackApp {
                         </button>
                     </div>
                 </div>
-                ${med.times.length > 0 && med.frequency !== 'asneeded' ? `
-                    <div class="medication-schedule">
-                        ${med.times.map(time => `
-                            <div class="schedule-time">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <circle cx="12" cy="12" r="10"/>
-                                    <polyline points="12 6 12 12 16 14"/>
-                                </svg>
-                                ${this.formatTime(time)}
-                            </div>
-                        `).join('')}
+                
+                ${med.frequency !== 'asneeded' ? `
+                    <div class="dose-tracker">
+                        <div class="dose-tracker-header">
+                            <span class="dose-tracker-title">Today's Doses</span>
+                            <span class="dose-tracker-count">${todayLogs.length}/${med.times.length}</span>
+                        </div>
+                        <div class="dose-checkboxes">
+                            ${med.times.map((time, index) => {
+                                const logId = `${med.id}-${time}-${todayStr}`;
+                                const isTaken = todayLogs.some(log => log.scheduledTime === time);
+                                const matchingLog = todayLogs.find(log => log.scheduledTime === time);
+                                return `
+                                    <label class="dose-checkbox ${isTaken ? 'checked' : ''}">
+                                        <input type="checkbox" 
+                                               data-med-id="${med.id}" 
+                                               data-time="${time}" 
+                                               data-log-id="${matchingLog ? matchingLog.id : ''}"
+                                               ${isTaken ? 'checked' : ''}>
+                                        <span class="checkbox-custom"></span>
+                                        <span class="dose-time">${this.formatTime(time)}</span>
+                                        ${isTaken && matchingLog ? `
+                                            <span class="dose-taken-time">✓ ${this.formatTimestamp(matchingLog.timestamp)}</span>
+                                        ` : ''}
+                                    </label>
+                                `;
+                            }).join('')}
+                        </div>
                     </div>
-                ` : ''}
+                ` : `
+                    <div class="dose-tracker">
+                        <button class="btn-log-dose" data-med-id="${med.id}">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M12 5v14M5 12h14"/>
+                            </svg>
+                            Log Dose Taken
+                        </button>
+                        ${todayLogs.length > 0 ? `
+                            <div class="asneeded-logs">
+                                Today: ${todayLogs.length} dose${todayLogs.length > 1 ? 's' : ''}
+                            </div>
+                        ` : ''}
+                    </div>
+                `}
+                
                 ${med.notes ? `
                     <div class="medication-notes">${med.notes}</div>
                 ` : ''}
             `;
 
+            // Delete button
             const deleteBtn = card.querySelector('.btn-med-action.delete');
             deleteBtn?.addEventListener('click', async () => {
                 if (confirm(`Delete ${med.name}?`)) {
@@ -676,6 +797,26 @@ class MedTrackApp {
                     this.medications = this.medications.filter(m => m.id !== med.id);
                     this.render();
                 }
+            });
+
+            // History button
+            const historyBtn = card.querySelector('.btn-med-action.history');
+            historyBtn?.addEventListener('click', () => {
+                this.showMedicationHistory(med, recentLogs);
+            });
+
+            // Dose checkboxes for scheduled medications
+            const checkboxes = card.querySelectorAll('.dose-checkbox input[type="checkbox"]');
+            checkboxes.forEach(checkbox => {
+                checkbox.addEventListener('change', async (e) => {
+                    await this.handleDoseToggle(e.target);
+                });
+            });
+
+            // Log dose button for as-needed medications
+            const logDoseBtn = card.querySelector('.btn-log-dose');
+            logDoseBtn?.addEventListener('click', async () => {
+                await this.logAsNeededDose(med.id);
             });
 
             this.medicationsList.appendChild(card);
@@ -842,6 +983,7 @@ class MedTrackApp {
                 
                 this.people = await this.storage.getPeople();
                 this.medications = await this.storage.getMedications();
+                this.doseLogs = await this.storage.getDoseLogs();
                 this.currentPersonId = this.people[0]?.id || null;
 
                 this.closeModal(this.importModal);
@@ -891,6 +1033,127 @@ class MedTrackApp {
         const period = hours >= 12 ? 'PM' : 'AM';
         const displayHours = hours % 12 || 12;
         return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
+
+    formatTimestamp(timestamp) {
+        const date = new Date(timestamp);
+        const hours = date.getHours();
+        const minutes = date.getMinutes();
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
+    }
+
+    async handleDoseToggle(checkbox) {
+        const medId = checkbox.dataset.medId;
+        const time = checkbox.dataset.time;
+        const logId = checkbox.dataset.logId;
+
+        if (checkbox.checked) {
+            // Log the dose
+            const doseLog = {
+                id: this.generateId(),
+                medicationId: medId,
+                scheduledTime: time,
+                timestamp: Date.now()
+            };
+
+            await this.storage.addDoseLog(doseLog);
+            this.doseLogs.push(doseLog);
+        } else {
+            // Remove the dose log
+            if (logId) {
+                await this.storage.deleteDoseLog(logId);
+                this.doseLogs = this.doseLogs.filter(log => log.id !== logId);
+            }
+        }
+
+        this.render();
+    }
+
+    async logAsNeededDose(medId) {
+        const doseLog = {
+            id: this.generateId(),
+            medicationId: medId,
+            scheduledTime: null,
+            timestamp: Date.now()
+        };
+
+        await this.storage.addDoseLog(doseLog);
+        this.doseLogs.push(doseLog);
+        this.render();
+    }
+
+    showMedicationHistory(med, recentLogs) {
+        // Group logs by date
+        const logsByDate = {};
+        recentLogs.forEach(log => {
+            const dateStr = new Date(log.timestamp).toDateString();
+            if (!logsByDate[dateStr]) {
+                logsByDate[dateStr] = [];
+            }
+            logsByDate[dateStr].push(log);
+        });
+
+        // Build history HTML
+        let historyHTML = `
+            <div class="history-header">
+                <h3>${med.name} - Last 7 Days</h3>
+                <p class="history-subtitle">${med.dosage} • ${this.getFrequencyText(med.frequency)}</p>
+            </div>
+        `;
+
+        const dates = Object.keys(logsByDate).sort((a, b) => new Date(b) - new Date(a));
+        
+        if (dates.length === 0) {
+            historyHTML += '<p class="no-history">No doses logged in the last 7 days</p>';
+        } else {
+            historyHTML += '<div class="history-timeline">';
+            dates.forEach(dateStr => {
+                const logs = logsByDate[dateStr];
+                const date = new Date(dateStr);
+                const isToday = date.toDateString() === new Date().toDateString();
+                const isYesterday = date.toDateString() === new Date(Date.now() - 86400000).toDateString();
+                
+                let displayDate = dateStr;
+                if (isToday) displayDate = 'Today';
+                else if (isYesterday) displayDate = 'Yesterday';
+                else displayDate = date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+
+                historyHTML += `
+                    <div class="history-day">
+                        <div class="history-date">${displayDate}</div>
+                        <div class="history-doses">
+                            ${logs.map(log => `
+                                <div class="history-dose">
+                                    <svg viewBox="0 0 24 24" fill="currentColor">
+                                        <circle cx="12" cy="12" r="10"/>
+                                        <path d="M9 12l2 2 4-4" stroke="white" stroke-width="2" fill="none"/>
+                                    </svg>
+                                    <span>${log.scheduledTime ? this.formatTime(log.scheduledTime) + ' dose' : 'Dose'} taken at ${this.formatTimestamp(log.timestamp)}</span>
+                                </div>
+                            `).join('')}
+                        </div>
+                        <div class="history-count">${logs.length} dose${logs.length > 1 ? 's' : ''}</div>
+                    </div>
+                `;
+            });
+            historyHTML += '</div>';
+        }
+
+        // Show in a simple alert for now (could be enhanced with a modal)
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = historyHTML;
+        const textContent = tempDiv.textContent;
+        
+        // Create a better display using confirm
+        alert(`${med.name} - Dose History\n\nLast 7 Days: ${recentLogs.length} total doses\n\n${dates.map(dateStr => {
+            const logs = logsByDate[dateStr];
+            const date = new Date(dateStr);
+            const isToday = date.toDateString() === new Date().toDateString();
+            const displayDate = isToday ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+            return `${displayDate}: ${logs.length} dose${logs.length > 1 ? 's' : ''}`;
+        }).join('\n')}`);
     }
 
     generateId() {
@@ -953,6 +1216,7 @@ class MedTrackApp {
             'This will permanently delete:\n' +
             '• All people\n' +
             '• All medications\n' +
+            '• All dose history\n' +
             '• All settings\n\n' +
             'This action CANNOT be undone!\n\n' +
             'Are you sure you want to continue?'
@@ -974,6 +1238,7 @@ class MedTrackApp {
             // Reset app state
             this.people = [];
             this.medications = [];
+            this.doseLogs = [];
             this.currentPersonId = null;
 
             // Create default person

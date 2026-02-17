@@ -424,6 +424,152 @@ body {
     border-left: 3px solid var(--accent-500);
 }
 
+/* Dose Tracker */
+.dose-tracker {
+    margin-top: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: var(--gray-50);
+    border-radius: var(--radius-md);
+}
+
+.dose-tracker-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: var(--spacing-md);
+}
+
+.dose-tracker-title {
+    font-weight: 600;
+    color: var(--text-primary);
+    font-size: 0.875rem;
+}
+
+.dose-tracker-count {
+    font-weight: 700;
+    color: var(--primary-600);
+    font-size: 0.875rem;
+}
+
+.dose-checkboxes {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+}
+
+.dose-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+    padding: var(--spacing-md);
+    background: white;
+    border: 2px solid var(--border);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    position: relative;
+}
+
+.dose-checkbox:hover {
+    border-color: var(--primary-400);
+    background: var(--primary-50);
+}
+
+.dose-checkbox.checked {
+    border-color: var(--accent-500);
+    background: var(--accent-50);
+}
+
+.dose-checkbox input[type="checkbox"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.checkbox-custom {
+    width: 1.5rem;
+    height: 1.5rem;
+    border: 2px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    transition: all var(--transition-fast);
+}
+
+.dose-checkbox input[type="checkbox"]:checked + .checkbox-custom {
+    background: var(--accent-600);
+    border-color: var(--accent-600);
+}
+
+.dose-checkbox input[type="checkbox"]:checked + .checkbox-custom::after {
+    content: '';
+    width: 0.5rem;
+    height: 0.75rem;
+    border: solid white;
+    border-width: 0 2px 2px 0;
+    transform: rotate(45deg);
+}
+
+.dose-time {
+    font-weight: 600;
+    color: var(--text-primary);
+    flex: 1;
+}
+
+.dose-taken-time {
+    font-size: 0.75rem;
+    color: var(--accent-600);
+    font-weight: 500;
+}
+
+.btn-log-dose {
+    width: 100%;
+    padding: var(--spacing-md);
+    background: var(--primary-600);
+    color: white;
+    border: none;
+    border-radius: var(--radius-md);
+    font-family: var(--font-body);
+    font-weight: 600;
+    font-size: 0.875rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    transition: all var(--transition-fast);
+}
+
+.btn-log-dose:hover {
+    background: var(--primary-500);
+    transform: translateY(-1px);
+}
+
+.btn-log-dose svg {
+    width: 1.125rem;
+    height: 1.125rem;
+}
+
+.asneeded-logs {
+    margin-top: var(--spacing-md);
+    text-align: center;
+    font-size: 0.875rem;
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.btn-med-action.history {
+    color: var(--primary-600);
+}
+
+.btn-med-action.history:hover {
+    background: var(--primary-50);
+    border-color: var(--primary-400);
+}
+
 /* FAB */
 .fab {
     position: fixed;
