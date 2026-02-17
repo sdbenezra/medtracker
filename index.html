@@ -98,14 +98,27 @@
                 <div class="modal-body">
                     <!-- Camera Option (hidden in edit mode) -->
                     <div class="camera-section" id="cameraSectionWrapper">
-                        <button class="btn-camera" id="cameraBtn">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                                <circle cx="12" cy="13" r="4"/>
-                            </svg>
-                            Scan Medication Label
-                        </button>
+                        <div class="scan-options" id="scanOptions">
+                            <button class="btn-camera btn-camera-photo" id="cameraBtnPhoto">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
+                                    <circle cx="12" cy="13" r="4"/>
+                                </svg>
+                                Take Photo
+                            </button>
+                            <button class="btn-camera btn-camera-file" id="cameraBtnFile">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+                                    <polyline points="17 8 12 3 7 8"/>
+                                    <line x1="12" y1="3" x2="12" y2="15"/>
+                                </svg>
+                                Choose File
+                            </button>
+                        </div>
+                        <!-- Camera input: triggers live camera on mobile -->
                         <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
+                        <!-- File input: opens file picker on all platforms -->
+                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
                         <div class="ocr-status" id="ocrStatus"></div>
                     </div>
 

@@ -542,29 +542,46 @@ class MedTrackApp {
             this.updateTimeInputs();
         });
 
-        // Camera
-        const cameraBtn = document.getElementById('cameraBtn');
-        const cameraInput = document.getElementById('cameraInput');
-        
-        cameraBtn.addEventListener('click', () => {
+        // Camera / file scan
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const cameraBtnPhoto = document.getElementById('cameraBtnPhoto');
+        const cameraBtnFile  = document.getElementById('cameraBtnFile');
+        const cameraInput    = document.getElementById('cameraInput');   // has capture="environment"
+        const fileInput      = document.getElementById('fileInput');      // plain file picker
+
+        // On desktop, add a small hint under Take Photo
+        if (!isMobile) {
+            const note = document.createElement('p');
+            note.className = 'desktop-note';
+            note.textContent = 'On desktop this opens a file picker. Use your phone to capture live photos.';
+            document.getElementById('cameraSectionWrapper').appendChild(note);
+        }
+
+        // "Take Photo" — uses capture="environment" so mobile opens camera directly
+        cameraBtnPhoto.addEventListener('click', () => {
+            cameraInput.value = '';
             cameraInput.click();
         });
 
-        cameraInput.addEventListener('change', async (e) => {
-            const file = e.target.files?.[0];
-            if (file) {
-                const ocrStatus = document.getElementById('ocrStatus');
-                const ocr = new OCRHandler(ocrStatus);
-                const result = await ocr.processImage(file);
-
-                if (result.name) {
-                    document.getElementById('medName').value = result.name;
-                }
-                if (result.dosage) {
-                    document.getElementById('medDosage').value = result.dosage;
-                }
-            }
+        // "Choose File" — plain file picker on all platforms
+        cameraBtnFile.addEventListener('click', () => {
+            fileInput.value = '';
+            fileInput.click();
         });
+
+        // Shared OCR handler for both inputs
+        const handleImageFile = async (e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            const ocrStatus = document.getElementById('ocrStatus');
+            const ocr = new OCRHandler(ocrStatus);
+            const result = await ocr.processImage(file);
+            if (result.name)   document.getElementById('medName').value   = result.name;
+            if (result.dosage) document.getElementById('medDosage').value = result.dosage;
+        };
+
+        cameraInput.addEventListener('change', handleImageFile);
+        fileInput.addEventListener('change', handleImageFile);
 
         // Export
         document.getElementById('exportBtn').addEventListener('click', () => {

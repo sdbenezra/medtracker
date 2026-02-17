@@ -761,21 +761,28 @@ body {
     margin-bottom: var(--spacing-lg);
 }
 
+.scan-options {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
+}
+
 .btn-camera {
     width: 100%;
-    padding: var(--spacing-lg);
+    padding: var(--spacing-lg) var(--spacing-md);
     border: 2px dashed var(--border);
     background: var(--gray-50);
     border-radius: var(--radius-lg);
     cursor: pointer;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
     color: var(--text-secondary);
     font-family: var(--font-body);
     font-weight: 500;
-    font-size: 1rem;
+    font-size: 0.9rem;
     transition: all var(--transition-fast);
 }
 
@@ -786,8 +793,31 @@ body {
 }
 
 .btn-camera svg {
-    width: 1.5rem;
-    height: 1.5rem;
+    width: 1.75rem;
+    height: 1.75rem;
+}
+
+.btn-camera-photo {
+    border-color: var(--primary-300);
+}
+
+.btn-camera-photo:hover {
+    border-color: var(--primary-500);
+    background: var(--primary-50);
+    color: var(--primary-600);
+}
+
+.btn-camera-file {
+    border-color: var(--gray-300);
+}
+
+/* On desktop, show a note that Take Photo opens file picker */
+.desktop-note {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    text-align: center;
+    margin-top: var(--spacing-sm);
+    font-style: italic;
 }
 
 .ocr-status {
