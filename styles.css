@@ -1287,40 +1287,112 @@ body {
     font-weight: bold;
 }
 
+/* Schedule type toggle */
+.schedule-type-toggle {
+    display: flex;
+    gap: 0;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.schedule-type-btn {
+    flex: 1;
+    display: flex;
+    cursor: pointer;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.schedule-type-btn input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.schedule-type-btn span {
+    flex: 1;
+    text-align: center;
+    padding: 0.5rem 1rem;
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--text-secondary);
+    background: var(--bg-secondary);
+    transition: all var(--transition-fast);
+}
+
+.schedule-type-btn input:checked + span {
+    background: var(--primary-600);
+    color: white;
+}
+
 /* Day of week picker */
 .day-picker {
     display: flex;
-    gap: var(--spacing-sm);
-    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+}
+
+.day-every-btn {
+    font-size: 0.75rem;
+    font-weight: 600;
+    padding: 0.25rem 0.6rem;
+    border: 1.5px solid var(--border);
+    border-radius: var(--radius-full);
+    background: var(--bg-secondary);
+    color: var(--text-secondary);
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all var(--transition-fast);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    flex-shrink: 0;
+}
+
+.day-every-btn.active,
+.day-every-btn:hover {
+    background: var(--primary-600);
+    border-color: var(--primary-600);
+    color: white;
 }
 
 .day-btn {
     display: flex;
-    flex-direction: column;
     align-items: center;
-    gap: 0.25rem;
+    justify-content: center;
     cursor: pointer;
-    font-size: 0.75rem;
-    font-weight: 600;
-    color: var(--text-secondary);
     user-select: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    flex-shrink: 0;
 }
 
 .day-btn input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
-    width: 2.25rem;
-    height: 2.25rem;
+    width: 2.1rem;
+    height: 2.1rem;
     border: 2px solid var(--border);
     border-radius: 50%;
     background: var(--bg-primary);
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
     transition: all var(--transition-fast);
-    -webkit-tap-highlight-color: transparent;
-    touch-action: manipulation;
+}
+
+.day-btn span {
+    position: absolute;
+    font-size: 0.7rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    pointer-events: none;
+    line-height: 1;
+}
+
+.day-btn {
+    position: relative;
 }
 
 .day-btn input[type="checkbox"]:checked {
@@ -1328,9 +1400,44 @@ body {
     border-color: var(--primary-600);
 }
 
-.day-btn input[type="checkbox"]:checked + span,
-.day-btn:has(input:checked) {
+.day-btn:has(input:checked) span {
+    color: white;
+}
+
+.field-hint {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 0.4rem;
+    font-style: italic;
+}
+
+/* Add time button */
+.btn-add-time {
+    display: flex;
+    align-items: center;
+    gap: 0.4rem;
+    margin-top: var(--spacing-sm);
+    padding: 0.4rem 0.75rem;
+    font-size: 0.875rem;
+    font-weight: 600;
     color: var(--primary-600);
+    background: transparent;
+    border: 1.5px dashed var(--primary-400);
+    border-radius: var(--radius-md);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
+.btn-add-time:hover {
+    background: var(--primary-50);
+    border-style: solid;
+}
+
+.btn-add-time svg {
+    width: 0.9rem;
+    height: 0.9rem;
 }
 
 /* Not scheduled today indicator */

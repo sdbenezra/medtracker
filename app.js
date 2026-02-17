@@ -361,9 +361,9 @@ class ReminderManager {
     // Share a single medication schedule to the system share sheet
     async shareMedication(medication, person) {
         const times = medication.times.map(t => this.formatTime(t)).join(', ');
-        const personLabel = person.name !== 'Me' ? ` for ${person.name}` : '';
+        const personLabel = person && person.name !== 'Me' ? ` for ${person.name}` : '';
         const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const dayLabel = medication.days && medication.days.length > 0
+        const dayLabel = medication.days && medication.days.length > 0 && medication.days.length < 7
             ? `\nDays: ${medication.days.sort((a,b)=>a-b).map(d => dayNames[d]).join(', ')}`
             : '';
 
@@ -398,7 +398,11 @@ class ReminderManager {
                 return `• ${med.name} ${med.dosage} – as needed`;
             }
             const times = med.times.map(t => this.formatTime(t)).join(', ');
-            return `• ${med.name} ${med.dosage} – daily at ${times}`;
+            const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+            const dayPart = med.days && med.days.length > 0 && med.days.length < 7
+                ? ` (${med.days.sort((a,b)=>a-b).map(d=>dayNames[d]).join(', ')})`
+                : '';
+            return `• ${med.name} ${med.dosage}${dayPart} at ${times}`;
         });
 
         const text = `💊 Medication Reminders${personLabel}\n\n${lines.join('\n')}`;
@@ -458,7 +462,6 @@ class MedTrackApp {
         this.medicationForm = document.getElementById('medicationForm');
         this.personForm = document.getElementById('personForm');
         this.timeInputsContainer = document.getElementById('timeInputs');
-        this.frequencySelect = document.getElementById('medFrequency');
     }
 
     attachEventListeners() {
@@ -536,6 +539,7 @@ class MedTrackApp {
                 this.openModal(this.addPersonModal);
             } else {
                 this.openModal(this.addMedicationModal);
+                this.initScheduleForm();
             }
         });
 
@@ -572,10 +576,26 @@ class MedTrackApp {
             this.closeModal(this.addMedicationModal);
         });
 
-        // Frequency change updates time inputs
-        this.frequencySelect.addEventListener('change', () => {
-            this.updateTimeInputs();
+        // Schedule type toggle (Scheduled / As needed)
+        document.querySelectorAll('input[name="scheduleType"]').forEach(radio => {
+            radio.addEventListener('change', () => this.updateScheduledSection());
         });
+
+        // "Every day" button — toggles all day checkboxes
+        on('everyDayBtn', 'click', () => {
+            const checks = document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]');
+            const allChecked = [...checks].every(cb => cb.checked);
+            checks.forEach(cb => { cb.checked = !allChecked; });
+            this.updateDaysHint();
+        });
+
+        // Day checkboxes — update hint text
+        document.querySelectorAll('#scheduledSection .day-btn input').forEach(cb => {
+            cb.addEventListener('change', () => this.updateDaysHint());
+        });
+
+        // "Add time" button
+        on('addTimeBtn', 'click', () => this.addTimeRow());
 
         // Camera / file scan
         const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
@@ -778,7 +798,7 @@ class MedTrackApp {
             card.className = 'medication-card';
             card.dataset.medId = med.id;
 
-            const frequencyText = this.getFrequencyText(med.frequency, med.days);
+            const frequencyText = this.getFrequencyText(med.frequency, med.days, med.times);
 
             // Get today's dose logs for this medication
             const today = new Date();
@@ -839,15 +859,10 @@ class MedTrackApp {
                 </div>
                 
                 ${med.frequency !== 'asneeded' ? (() => {
-                    const isWeekly = ['weekly1','weekly2','weekly3','weekly5','everyother','specificdays'].includes(med.frequency);
-                    const todayDow = new Date().getDay(); // 0=Sun … 6=Sat
+                    const todayDow = new Date().getDay();
                     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-
-                    // For every-other-day: check if today is a scheduled day based on dose history
-                    // We treat it as always eligible (user decides)
-                    const scheduledToday = !isWeekly
-                        || med.frequency === 'everyother'
-                        || (med.days && med.days.includes(todayDow));
+                    // Empty days = every day
+                    const scheduledToday = !med.days || med.days.length === 0 || med.days.includes(todayDow);
 
                     if (!scheduledToday) {
                         const nextDays = med.days
@@ -1078,85 +1093,68 @@ class MedTrackApp {
         };
     }
 
-    updateTimeInputs() {
-        const frequency = this.frequencySelect.value;
-        const timesContainer = document.getElementById('timesContainer');
-        const daysContainer = document.getElementById('daysContainer');
-        const isWeekly = ['weekly1','weekly2','weekly3','weekly5','everyother','specificdays'].includes(frequency);
-        const isSpecificDays = frequency === 'specificdays';
+    updateScheduledSection() {
+        const isScheduled = document.querySelector('input[name="scheduleType"]:checked')?.value === 'scheduled';
+        const section = document.getElementById('scheduledSection');
+        if (section) section.style.display = isScheduled ? 'block' : 'none';
+    }
 
-        // Show/hide day picker
-        daysContainer.style.display = isWeekly ? 'block' : 'none';
+    updateDaysHint() {
+        const checks  = [...document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]')];
+        const checked = checks.filter(cb => cb.checked);
+        const hint    = document.getElementById('daysHint');
+        const btn     = document.getElementById('everyDayBtn');
+        if (!hint) return;
 
-        // For specificdays let user pick freely; for other weekly options pre-check sensible defaults
-        if (isWeekly && !isSpecificDays) {
-            const checks = daysContainer.querySelectorAll('input[type="checkbox"]');
-            const defaults = {
-                weekly1: [1],          // Mon
-                weekly2: [1, 4],       // Mon, Thu
-                weekly3: [1, 3, 5],    // Mon, Wed, Fri
-                weekly5: [1,2,3,4,5],  // Mon–Fri
-                everyother: []         // user can leave blank — we'll note it's every other day
-            };
-            checks.forEach(cb => {
-                cb.checked = (defaults[frequency] || []).includes(Number(cb.value));
-            });
-        }
-
-        let count = 0;
-        switch (frequency) {
-            case 'once':        count = 1; break;
-            case 'twice':       count = 2; break;
-            case 'three':       count = 3; break;
-            case 'four':        count = 4; break;
-            case 'weekly1':
-            case 'weekly2':
-            case 'weekly3':
-            case 'weekly5':
-            case 'everyother':
-            case 'specificdays': count = 1; break;
-            case 'asneeded':    count = 0; break;
-        }
-
-        this.timeInputsContainer.innerHTML = '';
-
-        if (count === 0) {
-            timesContainer.style.display = 'none';
-            return;
-        }
-
-        timesContainer.style.display = 'block';
-
-        for (let i = 0; i < count; i++) {
-            const row = document.createElement('div');
-            row.className = 'time-input-row';
-            const defaultTime = this.getDefaultTime(i, count);
-            row.innerHTML = `
-                <input type="time" value="${defaultTime}" required>
-                ${count > 1 ? `
-                    <button type="button" class="btn-remove-time">
-                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                            <line x1="18" y1="6" x2="6" y2="18"/>
-                            <line x1="6" y1="6" x2="18" y2="18"/>
-                        </svg>
-                    </button>
-                ` : ''}
-            `;
-            const removeBtn = row.querySelector('.btn-remove-time');
-            if (removeBtn) removeBtn.addEventListener('click', () => row.remove());
-            this.timeInputsContainer.appendChild(row);
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        if (checked.length === 0 || checked.length === 7) {
+            hint.textContent = 'All days selected (every day)';
+            if (btn) btn.classList.add('active');
+        } else {
+            hint.textContent = checked.map(cb => dayNames[Number(cb.value)]).join(', ');
+            if (btn) btn.classList.remove('active');
         }
     }
 
-    getDefaultTime(index, total) {
-        const defaults = {
-            1: ['08:00'],
-            2: ['08:00', '20:00'],
-            3: ['08:00', '14:00', '20:00'],
-            4: ['08:00', '12:00', '17:00', '21:00']
-        };
+    addTimeRow(value = '08:00') {
+        const row = document.createElement('div');
+        row.className = 'time-input-row';
+        row.innerHTML = `
+            <input type="time" value="${value}">
+            <button type="button" class="btn-remove-time" title="Remove">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        `;
+        row.querySelector('.btn-remove-time').addEventListener('click', () => {
+            row.remove();
+            this.updateTimeRemoveButtons();
+        });
+        this.timeInputsContainer.appendChild(row);
+        this.updateTimeRemoveButtons();
+        // Focus the new time input
+        row.querySelector('input[type="time"]').focus();
+    }
 
-        return defaults[total]?.[index] || '08:00';
+    updateTimeRemoveButtons() {
+        // Hide the remove button when there's only one time row
+        const rows = this.timeInputsContainer.querySelectorAll('.time-input-row');
+        rows.forEach(row => {
+            const btn = row.querySelector('.btn-remove-time');
+            if (btn) btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
+        });
+    }
+
+    initScheduleForm() {
+        // Called when opening the add/edit modal — sets up initial state
+        this.updateScheduledSection();
+        this.updateDaysHint();
+        // Seed with one time row if container is empty
+        if (this.timeInputsContainer.children.length === 0) {
+            this.addTimeRow('08:00');
+        }
+        this.updateTimeRemoveButtons();
     }
 
     async handleAddPerson() {
@@ -1190,25 +1188,27 @@ class MedTrackApp {
         // Pre-fill fields
         document.getElementById('medName').value = med.name;
         document.getElementById('medDosage').value = med.dosage;
-        this.frequencySelect.value = med.frequency;
         document.getElementById('medNotes').value = med.notes || '';
 
-        // Build time inputs with existing values
-        this.updateTimeInputs();
-        if (med.frequency !== 'asneeded' && med.times.length > 0) {
-            const timeInputEls = this.timeInputsContainer.querySelectorAll('input[type="time"]');
-            med.times.forEach((t, i) => {
-                if (timeInputEls[i]) timeInputEls[i].value = t;
-            });
-        }
+        // Set schedule type radio
+        const isAsNeeded = med.frequency === 'asneeded';
+        document.querySelectorAll('input[name="scheduleType"]').forEach(r => {
+            r.checked = (r.value === (isAsNeeded ? 'asneeded' : 'scheduled'));
+        });
+        this.updateScheduledSection();
 
         // Restore day checkboxes
-        if (med.days && med.days.length > 0) {
-            const checks = document.querySelectorAll('#daysContainer input[type="checkbox"]');
-            checks.forEach(cb => {
-                cb.checked = med.days.includes(Number(cb.value));
-            });
-        }
+        const checks = document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]');
+        checks.forEach(cb => {
+            // empty days array = every day
+            cb.checked = !med.days || med.days.length === 0 || med.days.includes(Number(cb.value));
+        });
+        this.updateDaysHint();
+
+        // Restore time rows
+        this.timeInputsContainer.innerHTML = '';
+        const timesToRestore = med.times && med.times.length > 0 ? med.times : ['08:00'];
+        timesToRestore.forEach(t => this.addTimeRow(t));
 
         this.openModal(this.addMedicationModal);
     }
@@ -1223,12 +1223,15 @@ class MedTrackApp {
 
         const times = [];
         const timeInputs = this.timeInputsContainer.querySelectorAll('input[type="time"]');
-        timeInputs.forEach(input => times.push(input.value));
+        timeInputs.forEach(input => { if (input.value) times.push(input.value); });
 
-        // Collect selected days (for weekly/specific-day frequencies)
-        const days = [];
-        const dayChecks = document.querySelectorAll('#daysContainer input[type="checkbox"]:checked');
-        dayChecks.forEach(cb => days.push(Number(cb.value)));
+        // Collect selected days — empty array = every day
+        const isScheduled = document.querySelector('input[name="scheduleType"]:checked')?.value === 'scheduled';
+        const frequency = isScheduled ? 'scheduled' : 'asneeded';
+        const allChecks = [...document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]')];
+        const checkedDays = allChecks.filter(cb => cb.checked).map(cb => Number(cb.value));
+        // If all 7 are checked (or none), store empty array meaning "every day"
+        const days = (checkedDays.length === 0 || checkedDays.length === 7) ? [] : checkedDays;
 
         if (editId) {
             // --- EDIT existing medication ---
@@ -1237,7 +1240,7 @@ class MedTrackApp {
 
             existing.name      = nameInput.value.trim();
             existing.dosage    = dosageInput.value.trim();
-            existing.frequency = this.frequencySelect.value;
+            existing.frequency = frequency;
             existing.times     = times;
             existing.days      = days;
             existing.notes     = notesInput.value.trim() || undefined;
@@ -1254,7 +1257,7 @@ class MedTrackApp {
                 personId: this.currentPersonId,
                 name: nameInput.value.trim(),
                 dosage: dosageInput.value.trim(),
-                frequency: this.frequencySelect.value,
+                frequency: frequency,
                 times,
                 days,
                 sortOrder: maxOrder + 1,
@@ -1327,9 +1330,6 @@ class MedTrackApp {
 
     openModal(modal) {
         modal.classList.add('show');
-        if (modal === this.addMedicationModal) {
-            this.updateTimeInputs();
-        }
     }
 
     closeModal(modal) {
@@ -1341,36 +1341,46 @@ class MedTrackApp {
             document.getElementById('medicationSubmitBtn').textContent = 'Add Medication';
             document.getElementById('cameraSectionWrapper').style.display = '';
             document.getElementById('cameraDivider').style.display = '';
-            document.getElementById('daysContainer').style.display = 'none';
-            document.querySelectorAll('#daysContainer input[type="checkbox"]').forEach(cb => cb.checked = false);
+            // Reset schedule type to Scheduled
+            const scheduledRadio = document.querySelector('input[name="scheduleType"][value="scheduled"]');
+            if (scheduledRadio) scheduledRadio.checked = true;
+            this.updateScheduledSection();
+            // Uncheck all days (= every day)
+            document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]').forEach(cb => cb.checked = false);
+            this.updateDaysHint();
+            // Reset to one empty time row
+            if (this.timeInputsContainer) {
+                this.timeInputsContainer.innerHTML = '';
+                this.addTimeRow('08:00');
+            }
             const ocrStatus = document.getElementById('ocrStatus');
-            ocrStatus.classList.remove('show');
+            if (ocrStatus) ocrStatus.classList.remove('show');
         }
         if (modal === this.addPersonModal) {
             this.personForm.reset();
         }
     }
 
-    getFrequencyText(frequency, days) {
-        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const dayList = days && days.length > 0
-            ? days.sort((a,b) => a-b).map(d => dayNames[d]).join(', ')
-            : null;
+    getFrequencyText(frequency, days, times) {
+        if (frequency === 'asneeded') return 'As needed';
 
-        const map = {
-            once:        'Once daily',
-            twice:       'Twice daily',
-            three:       '3× daily',
-            four:        '4× daily',
-            weekly1:     dayList ? `Weekly (${dayList})` : 'Once a week',
-            weekly2:     dayList ? `2×/week (${dayList})` : 'Twice a week',
-            weekly3:     dayList ? `3×/week (${dayList})` : '3× a week',
-            weekly5:     dayList ? `5×/week (${dayList})` : '5× a week',
-            everyother:  'Every other day',
-            specificdays: dayList ? `${dayList}` : 'Specific days',
-            asneeded:    'As needed'
-        };
-        return map[frequency] || frequency;
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const timeCount = times && times.length > 0 ? times.length : 1;
+        const timesLabel = timeCount === 1 ? '1×' : `${timeCount}×`;
+
+        // Empty days array means every day
+        if (!days || days.length === 0 || days.length === 7) {
+            return `${timesLabel} daily`;
+        }
+
+        // Detect common shorthand patterns
+        const sorted = [...days].sort((a,b) => a-b);
+        const isWeekdays = sorted.join(',') === '1,2,3,4,5';
+        const isWeekends = sorted.join(',') === '0,6';
+        if (isWeekdays) return `${timesLabel} weekdays`;
+        if (isWeekends) return `${timesLabel} weekends`;
+
+        return `${timesLabel} · ${sorted.map(d => dayNames[d]).join(', ')}`;
     }
 
     formatTime(time) {
@@ -1444,7 +1454,7 @@ class MedTrackApp {
         let historyHTML = `
             <div class="history-header">
                 <h3>${med.name} - Last 7 Days</h3>
-                <p class="history-subtitle">${med.dosage} • ${this.getFrequencyText(med.frequency, med.days)}</p>
+                <p class="history-subtitle">${med.dosage} • ${this.getFrequencyText(med.frequency, med.days, med.times)}</p>
             </div>
         `;
 
