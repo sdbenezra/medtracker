@@ -347,58 +347,78 @@ class OCRHandler {
 }
 
 // Notification Manager
-class NotificationManager {
-    constructor() {
-        this.hasPermission = false;
+class ReminderManager {
+    // Check if Web Share API is available (works on iOS Safari, Chrome Android, etc.)
+    canShare() {
+        return navigator.share !== undefined;
     }
 
-    async requestPermission() {
-        if (!('Notification' in window)) {
-            console.log('This browser does not support notifications');
-            return false;
-        }
-
-        if (Notification.permission === 'granted') {
-            this.hasPermission = true;
-            return true;
-        }
-
-        if (Notification.permission !== 'denied') {
-            const permission = await Notification.requestPermission();
-            this.hasPermission = permission === 'granted';
-            return this.hasPermission;
-        }
-
-        return false;
+    // Detect iOS
+    isIOS() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
     }
 
-    scheduleReminder(medication, person) {
-        if (!this.hasPermission) {
-            return;
+    // Share a single medication schedule to the system share sheet
+    async shareMedication(medication, person) {
+        const times = medication.times.map(t => this.formatTime(t)).join(', ');
+        const personLabel = person.name !== 'Me' ? ` for ${person.name}` : '';
+
+        let text;
+        if (medication.frequency === 'asneeded') {
+            text = `💊 ${medication.name} ${medication.dosage}${personLabel}\nTake as needed${medication.notes ? '\n' + medication.notes : ''}`;
+        } else {
+            text = `💊 ${medication.name} ${medication.dosage}${personLabel}\nDaily at: ${times}${medication.notes ? '\n' + medication.notes : ''}`;
         }
 
-        // Note: For a production app, you'd use Service Workers for persistent notifications
-        // This is a simplified version using Web Notifications API
-        medication.times.forEach(time => {
-            const [hours, minutes] = time.split(':').map(Number);
-            const now = new Date();
-            const scheduledTime = new Date();
-            scheduledTime.setHours(hours, minutes, 0, 0);
-
-            if (scheduledTime <= now) {
-                scheduledTime.setDate(scheduledTime.getDate() + 1);
+        if (this.canShare()) {
+            try {
+                await navigator.share({ title: `Reminder: ${medication.name}`, text });
+                return { success: true };
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    return { success: false, error: err.message };
+                }
+                return { success: false, cancelled: true };
             }
+        } else {
+            // Fallback: return text for manual copy
+            return { success: false, text, noShareAPI: true };
+        }
+    }
 
-            const timeUntilNotification = scheduledTime.getTime() - now.getTime();
-
-            setTimeout(() => {
-                new Notification(`Time to take ${medication.name}`, {
-                    body: `${person.name} - ${medication.dosage}`,
-                    icon: '/icon.png',
-                    tag: medication.id
-                });
-            }, timeUntilNotification);
+    // Share ALL medications for a person at once
+    async shareAllMedications(medications, person) {
+        const personLabel = person.name !== 'Me' ? ` for ${person.name}` : '';
+        const lines = medications.map(med => {
+            if (med.frequency === 'asneeded') {
+                return `• ${med.name} ${med.dosage} – as needed`;
+            }
+            const times = med.times.map(t => this.formatTime(t)).join(', ');
+            return `• ${med.name} ${med.dosage} – daily at ${times}`;
         });
+
+        const text = `💊 Medication Reminders${personLabel}\n\n${lines.join('\n')}`;
+
+        if (this.canShare()) {
+            try {
+                await navigator.share({ title: `Medication Reminders`, text });
+                return { success: true };
+            } catch (err) {
+                if (err.name !== 'AbortError') {
+                    return { success: false, error: err.message };
+                }
+                return { success: false, cancelled: true };
+            }
+        } else {
+            return { success: false, text, noShareAPI: true };
+        }
+    }
+
+    formatTime(time) {
+        const [hours, minutes] = time.split(':').map(Number);
+        const period = hours >= 12 ? 'PM' : 'AM';
+        const displayHours = hours % 12 || 12;
+        return `${displayHours}:${minutes.toString().padStart(2, '0')} ${period}`;
     }
 }
 
@@ -406,7 +426,7 @@ class NotificationManager {
 class MedTrackApp {
     constructor() {
         this.storage = new MedTrackStorage();
-        this.notifications = new NotificationManager();
+        this.reminders = new ReminderManager();
         this.currentPersonId = null;
         this.people = [];
         this.medications = [];
@@ -415,8 +435,6 @@ class MedTrackApp {
 
     async init() {
         await this.storage.init();
-        await this.notifications.requestPermission();
-        
         this.cacheDOMElements();
         this.attachEventListeners();
         await this.loadData();
@@ -472,11 +490,16 @@ class MedTrackApp {
             }
         });
 
-        document.getElementById('requestNotifications').addEventListener('click', async () => {
-            const granted = await this.notifications.requestPermission();
-            this.updateNotificationStatus();
-            if (granted) {
-                alert('Notifications enabled! You will receive medication reminders.');
+        document.getElementById('shareAllRemindersBtn').addEventListener('click', async () => {
+            const currentMeds = this.medications.filter(m => m.personId === this.currentPersonId);
+            const person = this.people.find(p => p.id === this.currentPersonId);
+            if (!currentMeds.length) {
+                alert('No medications added yet.');
+                return;
+            }
+            const result = await this.reminders.shareAllMedications(currentMeds, person);
+            if (result.noShareAPI) {
+                this.showCopyFallback(result.text);
             }
         });
 
@@ -583,26 +606,34 @@ class MedTrackApp {
         cameraInput.addEventListener('change', handleImageFile);
         fileInput.addEventListener('change', handleImageFile);
 
-        // Export
+        // Export (click)
         document.getElementById('exportBtn').addEventListener('click', () => {
             this.handleExport();
         });
 
-        // Import - show import modal on long press
+        // Import - show import modal on long press (supports both mouse and touch)
         let pressTimer;
-        document.getElementById('exportBtn').addEventListener('mousedown', () => {
+        let longPressTriggered = false;
+
+        const startLongPress = () => {
+            longPressTriggered = false;
             pressTimer = setTimeout(() => {
+                longPressTriggered = true;
                 this.openModal(this.importModal);
-            }, 1000);
-        });
+            }, 800);
+        };
 
-        document.getElementById('exportBtn').addEventListener('mouseup', () => {
+        const cancelLongPress = () => {
             clearTimeout(pressTimer);
-        });
+        };
 
-        document.getElementById('exportBtn').addEventListener('mouseleave', () => {
-            clearTimeout(pressTimer);
-        });
+        const exportBtn = document.getElementById('exportBtn');
+        exportBtn.addEventListener('mousedown', startLongPress);
+        exportBtn.addEventListener('mouseup', cancelLongPress);
+        exportBtn.addEventListener('mouseleave', cancelLongPress);
+        exportBtn.addEventListener('touchstart', (e) => { startLongPress(); }, { passive: true });
+        exportBtn.addEventListener('touchend', cancelLongPress);
+        exportBtn.addEventListener('touchcancel', cancelLongPress);
 
         document.getElementById('confirmImportBtn').addEventListener('click', () => {
             this.handleImport();
@@ -753,6 +784,13 @@ class MedTrackApp {
                         <div class="medication-dosage">${med.dosage} • ${frequencyText}</div>
                     </div>
                     <div class="medication-actions">
+                        <button class="btn-med-action share" data-med-id="${med.id}" title="Send to Reminders">
+                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
+                                <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/>
+                                <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
+                            </svg>
+                        </button>
                         <button class="btn-med-action edit" data-med-id="${med.id}" title="Edit">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                                 <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
@@ -833,6 +871,16 @@ class MedTrackApp {
                     <div class="medication-notes">${med.notes}</div>
                 ` : ''}
             `;
+
+            // Share / Reminders button
+            const shareBtn = card.querySelector('.btn-med-action.share');
+            shareBtn?.addEventListener('click', async () => {
+                const person = this.people.find(p => p.id === this.currentPersonId);
+                const result = await this.reminders.shareMedication(med, person);
+                if (result.noShareAPI) {
+                    this.showCopyFallback(result.text);
+                }
+            });
 
             // Edit button
             const editBtn = card.querySelector('.btn-med-action.edit');
@@ -1032,10 +1080,6 @@ class MedTrackApp {
 
             await this.storage.addMedication(medication);
             this.medications.push(medication);
-
-            // Schedule notifications
-            const person = this.people.find(p => p.id === this.currentPersonId);
-            if (person) this.notifications.scheduleReminder(medication, person);
         }
 
         this.medicationForm.reset();
@@ -1269,30 +1313,24 @@ class MedTrackApp {
         // Update backup reminder toggle
         const backupReminder = await this.storage.getSetting('backupReminder');
         document.getElementById('backupReminderToggle').checked = backupReminder || false;
-
-        // Update notification status
-        this.updateNotificationStatus();
-
         this.openModal(this.settingsModal);
     }
 
-    updateNotificationStatus() {
-        const statusEl = document.getElementById('notificationStatus');
-        const btnEl = document.getElementById('requestNotifications');
+    showCopyFallback(text) {
+        // Used when Web Share API isn't available (e.g. desktop browsers)
+        const modal = document.getElementById('copyFallbackModal');
+        document.getElementById('copyFallbackText').value = text;
+        modal.classList.add('show');
 
-        if (Notification.permission === 'granted') {
-            statusEl.textContent = 'Enabled';
-            statusEl.style.color = 'var(--accent-600)';
-            btnEl.style.display = 'none';
-        } else if (Notification.permission === 'denied') {
-            statusEl.textContent = 'Blocked - Enable in browser settings';
-            statusEl.style.color = 'var(--error)';
-            btnEl.style.display = 'none';
-        } else {
-            statusEl.textContent = 'Not enabled';
-            statusEl.style.color = 'var(--text-secondary)';
-            btnEl.style.display = 'flex';
-        }
+        document.getElementById('closeCopyFallback').onclick = () => modal.classList.remove('show');
+        document.getElementById('copyTextBtn').onclick = () => {
+            navigator.clipboard.writeText(text).then(() => {
+                document.getElementById('copyTextBtn').textContent = 'Copied!';
+                setTimeout(() => {
+                    document.getElementById('copyTextBtn').textContent = 'Copy to Clipboard';
+                }, 2000);
+            });
+        };
     }
 
     async checkBackupReminder() {

@@ -72,6 +72,12 @@
     box-sizing: border-box;
 }
 
+/* Eliminate 300ms tap delay and blue flash on all interactive elements on iOS */
+a, button, input, select, textarea, label, [role="button"] {
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+}
+
 html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -87,18 +93,19 @@ body {
 
 #app {
     min-height: 100vh;
-    padding-bottom: 6rem;
+    min-height: -webkit-fill-available;
+    padding-bottom: calc(6rem + env(safe-area-inset-bottom));
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
 }
 
 /* Header */
 .header {
-    background: var(--bg-primary);
+    background: rgba(255, 255, 255, 0.97);
     border-bottom: 1px solid var(--border);
     position: sticky;
     top: 0;
     z-index: 40;
-    backdrop-filter: blur(10px);
-    background: rgba(255, 255, 255, 0.95);
 }
 
 .header-content {
@@ -132,8 +139,10 @@ body {
 }
 
 .btn-icon {
-    width: 2.5rem;
-    height: 2.5rem;
+    width: 2.75rem;
+    height: 2.75rem;
+    min-width: 44px;
+    min-height: 44px;
     border-radius: var(--radius-md);
     border: 1px solid var(--border);
     background: var(--bg-primary);
@@ -143,6 +152,8 @@ body {
     align-items: center;
     justify-content: center;
     transition: all var(--transition-fast);
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .btn-icon:hover {
@@ -165,7 +176,7 @@ body {
     gap: var(--spacing-md);
     align-items: center;
     overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-x: contain;
 }
 
 .person-pills {
@@ -568,6 +579,15 @@ body {
 .btn-med-action.history:hover {
     background: var(--primary-50);
     border-color: var(--primary-400);
+}
+
+.btn-med-action.share {
+    color: var(--accent-600);
+}
+
+.btn-med-action.share:hover {
+    background: var(--accent-50);
+    border-color: var(--accent-500);
 }
 
 .btn-med-action.edit {
