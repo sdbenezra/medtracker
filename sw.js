@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtrack-v5';
+const CACHE_NAME = 'medtrack-v6';
 
 // Use relative paths so the service worker works on any host/subpath
 const urlsToCache = [

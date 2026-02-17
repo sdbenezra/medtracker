@@ -284,16 +284,15 @@ class ReminderManager {
     async shareMedication(medication, person) {
         const times = medication.times.map(t => this.formatTime(t)).join(', ');
         const personLabel = person && person.name !== 'Me' ? ` for ${person.name}` : '';
-        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const dayLabel = medication.days && medication.days.length > 0 && medication.days.length < 7
-            ? `\nDays: ${medication.days.sort((a,b)=>a-b).map(d => dayNames[d]).join(', ')}`
+        const scheduleLabel = medication.frequency !== 'asneeded'
+            ? `\nSchedule: ${this.getRecurrenceText(medication)}\nAt: ${times}`
             : '';
 
         let text;
         if (medication.frequency === 'asneeded') {
             text = `💊 ${medication.name} ${medication.dosage}${personLabel}\nTake as needed${medication.notes ? '\n' + medication.notes : ''}`;
         } else {
-            text = `💊 ${medication.name} ${medication.dosage}${personLabel}${dayLabel}\nAt: ${times}${medication.notes ? '\n' + medication.notes : ''}`;
+            text = `💊 ${medication.name} ${medication.dosage}${personLabel}${scheduleLabel}${medication.notes ? '\n' + medication.notes : ''}`;
         }
 
         if (this.canShare()) {
@@ -320,11 +319,8 @@ class ReminderManager {
                 return `• ${med.name} ${med.dosage} – as needed`;
             }
             const times = med.times.map(t => this.formatTime(t)).join(', ');
-            const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-            const dayPart = med.days && med.days.length > 0 && med.days.length < 7
-                ? ` (${med.days.sort((a,b)=>a-b).map(d=>dayNames[d]).join(', ')})`
-                : '';
-            return `• ${med.name} ${med.dosage}${dayPart} at ${times}`;
+            const schedule = this.getRecurrenceText(med);
+            return `• ${med.name} ${med.dosage} – ${schedule} at ${times}`;
         });
 
         const text = `💊 Medication Reminders${personLabel}\n\n${lines.join('\n')}`;
@@ -503,18 +499,12 @@ class MedTrackApp {
             radio.addEventListener('change', () => this.updateScheduledSection());
         });
 
-        // "Every day" button — toggles all day checkboxes
-        on('everyDayBtn', 'click', () => {
-            const checks = document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]');
-            const allChecked = [...checks].every(cb => cb.checked);
-            checks.forEach(cb => { cb.checked = !allChecked; });
-            this.updateDaysHint();
-        });
+        // Recurrence type dropdown
+        on('recurrenceType', 'change', () => this.updateRecurrenceSections());
 
-        // Day checkboxes — update hint text
-        document.querySelectorAll('#scheduledSection .day-btn input').forEach(cb => {
-            cb.addEventListener('change', () => this.updateDaysHint());
-        });
+        // Monthly mode toggle
+        document.querySelectorAll('input[name="monthlyMode"]').forEach(r =>
+            r.addEventListener('change', () => this.updateMonthlyMode()));
 
         // "Add time" button
         on('addTimeBtn', 'click', () => this.addTimeRow());
@@ -679,7 +669,7 @@ class MedTrackApp {
             card.className = 'medication-card';
             card.dataset.medId = med.id;
 
-            const frequencyText = this.getFrequencyText(med.frequency, med.days, med.times);
+            const frequencyText = this.getRecurrenceText(med);
 
             // Get today's dose logs for this medication
             const today = new Date();
@@ -740,20 +730,29 @@ class MedTrackApp {
                 </div>
                 
                 ${med.frequency !== 'asneeded' ? (() => {
-                    const todayDow = new Date().getDay();
+                    const today = new Date();
+                    const todayDow = today.getDay();
                     const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-                    // Empty days = every day
-                    const scheduledToday = !med.days || med.days.length === 0 || med.days.includes(todayDow);
+                    const scheduledToday = this.isScheduledOn(med, today);
 
                     if (!scheduledToday) {
-                        const nextDays = med.days
-                            ? med.days.filter(d => d > todayDow).concat(med.days.filter(d => d <= todayDow))
-                            : [];
-                        const nextDay = nextDays.length > 0 ? dayNames[nextDays[0]] : '';
+                        // Find the next scheduled day (search up to 60 days ahead)
+                        let nextLabel = '';
+                        for (let i = 1; i <= 60; i++) {
+                            const d = new Date(today);
+                            d.setDate(today.getDate() + i);
+                            if (this.isScheduledOn(med, d)) {
+                                const diff = i === 1 ? 'Tomorrow' : i <= 6
+                                    ? dayNames[d.getDay()]
+                                    : `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`;
+                                nextLabel = diff;
+                                break;
+                            }
+                        }
                         return `
                             <div class="dose-tracker dose-not-today">
                                 <span class="dose-not-today-msg">
-                                    Not scheduled today${nextDay ? ` · Next: ${nextDay}` : ''}
+                                    Not scheduled today${nextLabel ? ` · Next: ${nextLabel}` : ''}
                                 </span>
                             </div>
                         `;
@@ -978,23 +977,222 @@ class MedTrackApp {
         const isScheduled = document.querySelector('input[name="scheduleType"]:checked')?.value === 'scheduled';
         const section = document.getElementById('scheduledSection');
         if (section) section.style.display = isScheduled ? 'block' : 'none';
+        if (isScheduled) this.updateRecurrenceSections();
     }
 
-    updateDaysHint() {
-        const checks  = [...document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]')];
-        const checked = checks.filter(cb => cb.checked);
-        const hint    = document.getElementById('daysHint');
-        const btn     = document.getElementById('everyDayBtn');
-        if (!hint) return;
+    updateRecurrenceSections() {
+        const type = document.getElementById('recurrenceType')?.value;
+        document.getElementById('weeklySection').style.display      = type === 'weekly'       ? 'block' : 'none';
+        document.getElementById('everyNWeeksSection').style.display = type === 'everyNWeeks'  ? 'block' : 'none';
+        document.getElementById('monthlySection').style.display     = type === 'monthly'      ? 'block' : 'none';
+        if (type === 'monthly') this.updateMonthlyMode();
+    }
 
-        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        if (checked.length === 0 || checked.length === 7) {
-            hint.textContent = 'All days selected (every day)';
-            if (btn) btn.classList.add('active');
-        } else {
-            hint.textContent = checked.map(cb => dayNames[Number(cb.value)]).join(', ');
-            if (btn) btn.classList.remove('active');
+    updateMonthlyMode() {
+        const mode = document.querySelector('input[name="monthlyMode"]:checked')?.value;
+        document.getElementById('monthlyDateSection').style.display    = mode === 'date'    ? 'block' : 'none';
+        document.getElementById('monthlyWeekdaySection').style.display = mode === 'weekday' ? 'block' : 'none';
+    }
+
+    // Build a recurrence object from the current form state
+    readRecurrenceFromForm() {
+        const isScheduled = document.querySelector('input[name="scheduleType"]:checked')?.value === 'scheduled';
+        if (!isScheduled) return null;
+
+        const type = document.getElementById('recurrenceType').value;
+
+        if (type === 'daily') {
+            return { type: 'daily' };
         }
+
+        if (type === 'weekly') {
+            const days = [...document.querySelectorAll('input[name="weeklyDay"]:checked')]
+                .map(cb => Number(cb.value));
+            return { type: 'weekly', days };
+        }
+
+        if (type === 'everyNWeeks') {
+            const n = Number(document.getElementById('nWeeksCount').value);
+            const days = [...document.querySelectorAll('input[name="nWeeksDay"]:checked')]
+                .map(cb => Number(cb.value));
+            return { type: 'everyNWeeks', n, days, anchor: Date.now() };
+        }
+
+        if (type === 'monthly') {
+            const mode = document.querySelector('input[name="monthlyMode"]:checked').value;
+            if (mode === 'date') {
+                return { type: 'monthly', mode: 'date',
+                         dayOfMonth: Number(document.getElementById('monthlyDayOfMonth').value) };
+            } else {
+                return { type: 'monthly', mode: 'weekday',
+                         week: Number(document.getElementById('monthlyWeek').value),
+                         dow:  Number(document.getElementById('monthlyWeekday').value) };
+            }
+        }
+        return { type: 'daily' };
+    }
+
+    // Populate the form from a saved recurrence object
+    applyRecurrenceToForm(rec) {
+        if (!rec) { rec = { type: 'daily' }; }
+
+        // Migrate legacy days-array format
+        if (!rec.type) {
+            rec = rec.days && rec.days.length > 0 && rec.days.length < 7
+                ? { type: 'weekly', days: rec.days }
+                : { type: 'daily' };
+        }
+
+        const sel = document.getElementById('recurrenceType');
+        sel.value = rec.type;
+        this.updateRecurrenceSections();
+
+        if (rec.type === 'weekly') {
+            document.querySelectorAll('input[name="weeklyDay"]').forEach(cb => {
+                cb.checked = rec.days && rec.days.includes(Number(cb.value));
+            });
+        }
+
+        if (rec.type === 'everyNWeeks') {
+            document.getElementById('nWeeksCount').value = rec.n || 2;
+            document.querySelectorAll('input[name="nWeeksDay"]').forEach(cb => {
+                cb.checked = rec.days && rec.days.includes(Number(cb.value));
+            });
+        }
+
+        if (rec.type === 'monthly') {
+            const mode = rec.mode || 'date';
+            document.querySelector(`input[name="monthlyMode"][value="${mode}"]`).checked = true;
+            this.updateMonthlyMode();
+            if (mode === 'date') {
+                document.getElementById('monthlyDayOfMonth').value = rec.dayOfMonth || 1;
+            } else {
+                document.getElementById('monthlyWeek').value    = rec.week ?? 1;
+                document.getElementById('monthlyWeekday').value = rec.dow  ?? 1;
+            }
+        }
+    }
+
+    // Returns true if the medication is scheduled on a given Date (default today)
+    isScheduledOn(med, date = new Date()) {
+        const rec = med.recurrence;
+        if (!rec) {
+            // Legacy: old days-array model
+            const days = med.days;
+            if (!days || days.length === 0) return true;
+            return days.includes(date.getDay());
+        }
+
+        if (rec.type === 'daily') return true;
+
+        if (rec.type === 'weekly') {
+            if (!rec.days || rec.days.length === 0) return true;
+            return rec.days.includes(date.getDay());
+        }
+
+        if (rec.type === 'everyNWeeks') {
+            if (!rec.days || !rec.days.includes(date.getDay())) return false;
+            // Determine which week of the cycle we're in
+            const anchor = new Date(rec.anchor || med.createdAt || Date.now());
+            const anchorMonday = new Date(anchor);
+            anchorMonday.setHours(0, 0, 0, 0);
+            anchorMonday.setDate(anchor.getDate() - ((anchor.getDay() + 6) % 7)); // back to Mon
+            const targetMonday = new Date(date);
+            targetMonday.setHours(0, 0, 0, 0);
+            targetMonday.setDate(date.getDate() - ((date.getDay() + 6) % 7));
+            const weeksDiff = Math.round((targetMonday - anchorMonday) / (7 * 86400000));
+            return weeksDiff % rec.n === 0;
+        }
+
+        if (rec.type === 'monthly') {
+            if (rec.mode === 'date') {
+                const dom = date.getDate();
+                const target = rec.dayOfMonth;
+                // ±1 day window; also handle months shorter than target date
+                const lastDay = new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
+                const effective = Math.min(target, lastDay);
+                return Math.abs(dom - effective) <= 1;
+            }
+            if (rec.mode === 'weekday') {
+                if (date.getDay() !== rec.dow) return false;
+                const week = rec.week;
+                if (week === -1) {
+                    // Last occurrence: check if adding 7 days goes into next month
+                    const next = new Date(date);
+                    next.setDate(date.getDate() + 7);
+                    return next.getMonth() !== date.getMonth();
+                }
+                // nth occurrence: which occurrence of this weekday is this?
+                const occurrence = Math.ceil(date.getDate() / 7);
+                return occurrence === week;
+            }
+        }
+        return false;
+    }
+
+    // Human-readable recurrence summary for the medication card
+    getRecurrenceText(med) {
+        if (med.frequency === 'asneeded') return 'As needed';
+
+        const rec = med.recurrence;
+        const timeCount = med.times && med.times.length > 0 ? med.times.length : 1;
+        const tx = timeCount === 1 ? '1×' : `${timeCount}×`;
+        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+        const ordinals = ['', 'First','Second','Third','Fourth','Last'];
+
+        if (!rec) {
+            // Legacy days-array
+            const days = med.days;
+            if (!days || days.length === 0 || days.length === 7) return `${tx} daily`;
+            const sorted = [...days].sort((a,b) => a-b);
+            if (sorted.join(',') === '1,2,3,4,5') return `${tx} weekdays`;
+            if (sorted.join(',') === '0,6')       return `${tx} weekends`;
+            return `${tx} · ${sorted.map(d => dayNames[d]).join(', ')}`;
+        }
+
+        if (rec.type === 'daily') return `${tx} daily`;
+
+        if (rec.type === 'weekly') {
+            if (!rec.days || rec.days.length === 0 || rec.days.length === 7) return `${tx} daily`;
+            const sorted = [...rec.days].sort((a,b) => a-b);
+            if (sorted.join(',') === '1,2,3,4,5') return `${tx} weekdays`;
+            if (sorted.join(',') === '0,6')       return `${tx} weekends`;
+            return `${tx} · ${sorted.map(d => dayNames[d]).join(', ')}`;
+        }
+
+        if (rec.type === 'everyNWeeks') {
+            const dayList = rec.days && rec.days.length
+                ? rec.days.sort((a,b)=>a-b).map(d => dayNames[d]).join(', ')
+                : '—';
+            return `${tx} every ${rec.n}wks · ${dayList}`;
+        }
+
+        if (rec.type === 'monthly') {
+            if (rec.mode === 'date') {
+                const ord = this.ordinal(rec.dayOfMonth);
+                return `${tx} monthly · ${ord}`;
+            }
+            if (rec.mode === 'weekday') {
+                const wk  = rec.week === -1 ? 'Last' : (ordinals[rec.week] || `${rec.week}.`);
+                return `${tx} monthly · ${wk} ${dayNames[rec.dow]}`;
+            }
+        }
+        return `${tx} scheduled`;
+    }
+
+    ordinal(n) {
+        const s = ['th','st','nd','rd'];
+        const v = n % 100;
+        return n + (s[(v-20)%10] || s[v] || s[0]);
+    }
+
+    initScheduleForm() {
+        this.updateScheduledSection();
+        this.updateRecurrenceSections();
+        if (this.timeInputsContainer.children.length === 0) {
+            this.addTimeRow('08:00');
+        }
+        this.updateTimeRemoveButtons();
     }
 
     addTimeRow(value = '08:00') {
@@ -1014,28 +1212,15 @@ class MedTrackApp {
         });
         this.timeInputsContainer.appendChild(row);
         this.updateTimeRemoveButtons();
-        // Focus the new time input
         row.querySelector('input[type="time"]').focus();
     }
 
     updateTimeRemoveButtons() {
-        // Hide the remove button when there's only one time row
         const rows = this.timeInputsContainer.querySelectorAll('.time-input-row');
         rows.forEach(row => {
             const btn = row.querySelector('.btn-remove-time');
             if (btn) btn.style.visibility = rows.length > 1 ? 'visible' : 'hidden';
         });
-    }
-
-    initScheduleForm() {
-        // Called when opening the add/edit modal — sets up initial state
-        this.updateScheduledSection();
-        this.updateDaysHint();
-        // Seed with one time row if container is empty
-        if (this.timeInputsContainer.children.length === 0) {
-            this.addTimeRow('08:00');
-        }
-        this.updateTimeRemoveButtons();
     }
 
     async handleAddPerson() {
@@ -1076,13 +1261,8 @@ class MedTrackApp {
         });
         this.updateScheduledSection();
 
-        // Restore day checkboxes
-        const checks = document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]');
-        checks.forEach(cb => {
-            // empty days array = every day
-            cb.checked = !med.days || med.days.length === 0 || med.days.includes(Number(cb.value));
-        });
-        this.updateDaysHint();
+        // Restore recurrence
+        this.applyRecurrenceToForm(med.recurrence || (med.days ? { type: 'weekly', days: med.days } : { type: 'daily' }));
 
         // Restore time rows
         this.timeInputsContainer.innerHTML = '';
@@ -1104,25 +1284,21 @@ class MedTrackApp {
         const timeInputs = this.timeInputsContainer.querySelectorAll('input[type="time"]');
         timeInputs.forEach(input => { if (input.value) times.push(input.value); });
 
-        // Collect selected days — empty array = every day
         const isScheduled = document.querySelector('input[name="scheduleType"]:checked')?.value === 'scheduled';
-        const frequency = isScheduled ? 'scheduled' : 'asneeded';
-        const allChecks = [...document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]')];
-        const checkedDays = allChecks.filter(cb => cb.checked).map(cb => Number(cb.value));
-        // If all 7 are checked (or none), store empty array meaning "every day"
-        const days = (checkedDays.length === 0 || checkedDays.length === 7) ? [] : checkedDays;
+        const frequency  = isScheduled ? 'scheduled' : 'asneeded';
+        const recurrence = isScheduled ? this.readRecurrenceFromForm() : null;
 
         if (editId) {
             // --- EDIT existing medication ---
             const existing = this.medications.find(m => m.id === editId);
             if (!existing) return;
 
-            existing.name      = nameInput.value.trim();
-            existing.dosage    = dosageInput.value.trim();
-            existing.frequency = frequency;
-            existing.times     = times;
-            existing.days      = days;
-            existing.notes     = notesInput.value.trim() || undefined;
+            existing.name       = nameInput.value.trim();
+            existing.dosage     = dosageInput.value.trim();
+            existing.frequency  = frequency;
+            existing.times      = times;
+            existing.recurrence = recurrence;
+            existing.notes      = notesInput.value.trim() || undefined;
 
             await this.storage.updateMedication(existing);
         } else {
@@ -1138,7 +1314,8 @@ class MedTrackApp {
                 dosage: dosageInput.value.trim(),
                 frequency: frequency,
                 times,
-                days,
+                recurrence,
+                createdAt: Date.now(),
                 sortOrder: maxOrder + 1,
                 notes: notesInput.value.trim() || undefined
             };
@@ -1222,9 +1399,9 @@ class MedTrackApp {
             const scheduledRadio = document.querySelector('input[name="scheduleType"][value="scheduled"]');
             if (scheduledRadio) scheduledRadio.checked = true;
             this.updateScheduledSection();
-            // Uncheck all days (= every day)
-            document.querySelectorAll('#scheduledSection .day-btn input[type="checkbox"]').forEach(cb => cb.checked = false);
-            this.updateDaysHint();
+            // Reset recurrence to daily
+            const recSel = document.getElementById('recurrenceType');
+            if (recSel) { recSel.value = 'daily'; this.updateRecurrenceSections(); }
             // Reset to one empty time row
             if (this.timeInputsContainer) {
                 this.timeInputsContainer.innerHTML = '';
@@ -1234,28 +1411,6 @@ class MedTrackApp {
         if (modal === this.addPersonModal) {
             this.personForm.reset();
         }
-    }
-
-    getFrequencyText(frequency, days, times) {
-        if (frequency === 'asneeded') return 'As needed';
-
-        const dayNames = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
-        const timeCount = times && times.length > 0 ? times.length : 1;
-        const timesLabel = timeCount === 1 ? '1×' : `${timeCount}×`;
-
-        // Empty days array means every day
-        if (!days || days.length === 0 || days.length === 7) {
-            return `${timesLabel} daily`;
-        }
-
-        // Detect common shorthand patterns
-        const sorted = [...days].sort((a,b) => a-b);
-        const isWeekdays = sorted.join(',') === '1,2,3,4,5';
-        const isWeekends = sorted.join(',') === '0,6';
-        if (isWeekdays) return `${timesLabel} weekdays`;
-        if (isWeekends) return `${timesLabel} weekends`;
-
-        return `${timesLabel} · ${sorted.map(d => dayNames[d]).join(', ')}`;
     }
 
     formatTime(time) {
@@ -1329,7 +1484,7 @@ class MedTrackApp {
         let historyHTML = `
             <div class="history-header">
                 <h3>${med.name} - Last 7 Days</h3>
-                <p class="history-subtitle">${med.dosage} • ${this.getFrequencyText(med.frequency, med.days, med.times)}</p>
+                <p class="history-subtitle">${med.dosage} • ${this.getRecurrenceText(med)}</p>
             </div>
         `;
 

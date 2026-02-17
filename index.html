@@ -135,18 +135,110 @@
 
                         <div id="scheduledSection">
                             <div class="form-group">
-                                <label>Days</label>
-                                <div class="day-picker">
-                                    <button type="button" class="day-every-btn" id="everyDayBtn">Every day</button>
-                                    <label class="day-btn"><span>S</span><input type="checkbox" value="0"></label>
-                                    <label class="day-btn"><span>M</span><input type="checkbox" value="1"></label>
-                                    <label class="day-btn"><span>T</span><input type="checkbox" value="2"></label>
-                                    <label class="day-btn"><span>W</span><input type="checkbox" value="3"></label>
-                                    <label class="day-btn"><span>T</span><input type="checkbox" value="4"></label>
-                                    <label class="day-btn"><span>F</span><input type="checkbox" value="5"></label>
-                                    <label class="day-btn"><span>S</span><input type="checkbox" value="6"></label>
+                                <label>Repeat</label>
+                                <select id="recurrenceType">
+                                    <option value="daily">Every day</option>
+                                    <option value="weekly">Days of the week</option>
+                                    <option value="everyNWeeks">Every N weeks</option>
+                                    <option value="monthly">Monthly</option>
+                                </select>
+                            </div>
+
+                            <!-- Weekly day picker -->
+                            <div class="form-group" id="weeklySection" style="display:none;">
+                                <label>On these days</label>
+                                <div class="day-picker" id="weeklyDayPicker">
+                                    <label class="day-btn"><span>S</span><input type="checkbox" name="weeklyDay" value="0"></label>
+                                    <label class="day-btn"><span>M</span><input type="checkbox" name="weeklyDay" value="1"></label>
+                                    <label class="day-btn"><span>T</span><input type="checkbox" name="weeklyDay" value="2"></label>
+                                    <label class="day-btn"><span>W</span><input type="checkbox" name="weeklyDay" value="3"></label>
+                                    <label class="day-btn"><span>T</span><input type="checkbox" name="weeklyDay" value="4"></label>
+                                    <label class="day-btn"><span>F</span><input type="checkbox" name="weeklyDay" value="5"></label>
+                                    <label class="day-btn"><span>S</span><input type="checkbox" name="weeklyDay" value="6"></label>
                                 </div>
-                                <p class="field-hint" id="daysHint">All days selected (every day)</p>
+                            </div>
+
+                            <!-- Every N weeks -->
+                            <div class="form-group" id="everyNWeeksSection" style="display:none;">
+                                <label>Every
+                                    <select id="nWeeksCount">
+                                        <option value="2">2 weeks</option>
+                                        <option value="3">3 weeks</option>
+                                        <option value="4">4 weeks</option>
+                                    </select>
+                                    on these days
+                                </label>
+                                <div class="day-picker" id="nWeeksDayPicker">
+                                    <label class="day-btn"><span>S</span><input type="checkbox" name="nWeeksDay" value="0"></label>
+                                    <label class="day-btn"><span>M</span><input type="checkbox" name="nWeeksDay" value="1"></label>
+                                    <label class="day-btn"><span>T</span><input type="checkbox" name="nWeeksDay" value="2"></label>
+                                    <label class="day-btn"><span>W</span><input type="checkbox" name="nWeeksDay" value="3"></label>
+                                    <label class="day-btn"><span>T</span><input type="checkbox" name="nWeeksDay" value="4"></label>
+                                    <label class="day-btn"><span>F</span><input type="checkbox" name="nWeeksDay" value="5"></label>
+                                    <label class="day-btn"><span>S</span><input type="checkbox" name="nWeeksDay" value="6"></label>
+                                </div>
+                                <p class="field-hint">Cycle starts from when the medication is first saved.</p>
+                            </div>
+
+                            <!-- Monthly -->
+                            <div class="form-group" id="monthlySection" style="display:none;">
+                                <label>Monthly on</label>
+                                <div class="monthly-mode-toggle">
+                                    <label class="schedule-type-btn">
+                                        <input type="radio" name="monthlyMode" value="date" checked>
+                                        <span>Date of month</span>
+                                    </label>
+                                    <label class="schedule-type-btn">
+                                        <input type="radio" name="monthlyMode" value="weekday">
+                                        <span>Day of week</span>
+                                    </label>
+                                </div>
+
+                                <!-- Monthly by date -->
+                                <div id="monthlyDateSection" style="margin-top:0.75rem;">
+                                    <select id="monthlyDayOfMonth">
+                                        <option value="1">1st</option><option value="2">2nd</option>
+                                        <option value="3">3rd</option><option value="4">4th</option>
+                                        <option value="5">5th</option><option value="6">6th</option>
+                                        <option value="7">7th</option><option value="8">8th</option>
+                                        <option value="9">9th</option><option value="10">10th</option>
+                                        <option value="11">11th</option><option value="12">12th</option>
+                                        <option value="13">13th</option><option value="14">14th</option>
+                                        <option value="15">15th</option><option value="16">16th</option>
+                                        <option value="17">17th</option><option value="18">18th</option>
+                                        <option value="19">19th</option><option value="20">20th</option>
+                                        <option value="21">21st</option><option value="22">22nd</option>
+                                        <option value="23">23rd</option><option value="24">24th</option>
+                                        <option value="25">25th</option><option value="26">26th</option>
+                                        <option value="27">27th</option><option value="28">28th</option>
+                                        <option value="29">29th</option><option value="30">30th</option>
+                                        <option value="31">31st</option>
+                                    </select>
+                                    <span class="field-hint">of each month</span>
+                                </div>
+
+                                <!-- Monthly by weekday -->
+                                <div id="monthlyWeekdaySection" style="display:none; margin-top:0.75rem;">
+                                    <div class="monthly-weekday-row">
+                                        <select id="monthlyWeek">
+                                            <option value="1">First</option>
+                                            <option value="2">Second</option>
+                                            <option value="3">Third</option>
+                                            <option value="4">Fourth</option>
+                                            <option value="-1">Last</option>
+                                        </select>
+                                        <select id="monthlyWeekday">
+                                            <option value="0">Sunday</option>
+                                            <option value="1">Monday</option>
+                                            <option value="2">Tuesday</option>
+                                            <option value="3">Wednesday</option>
+                                            <option value="4">Thursday</option>
+                                            <option value="5">Friday</option>
+                                            <option value="6">Saturday</option>
+                                        </select>
+                                    </div>
+                                    <span class="field-hint">of each month</span>
+                                </div>
                             </div>
 
                             <div class="form-group">
