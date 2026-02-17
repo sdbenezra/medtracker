@@ -104,36 +104,6 @@
                 </div>
 
                 <div class="modal-body">
-                    <!-- Camera Option (hidden in edit mode) -->
-                    <div class="camera-section" id="cameraSectionWrapper">
-                        <div class="scan-options" id="scanOptions">
-                            <button class="btn-camera btn-camera-photo" id="cameraBtnPhoto">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/>
-                                    <circle cx="12" cy="13" r="4"/>
-                                </svg>
-                                Take Photo
-                            </button>
-                            <button class="btn-camera btn-camera-file" id="cameraBtnFile">
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                    <polyline points="17 8 12 3 7 8"/>
-                                    <line x1="12" y1="3" x2="12" y2="15"/>
-                                </svg>
-                                Choose File
-                            </button>
-                        </div>
-                        <!-- Camera input: triggers live camera on mobile -->
-                        <input type="file" id="cameraInput" accept="image/*" capture="environment" style="display: none;">
-                        <!-- File input: opens file picker on all platforms -->
-                        <input type="file" id="fileInput" accept="image/*" style="display: none;">
-                        <div class="ocr-status" id="ocrStatus"></div>
-                    </div>
-
-                    <div class="divider" id="cameraDivider">
-                        <span>or enter manually</span>
-                    </div>
-
                     <!-- Medication Form -->
                     <form id="medicationForm">
                         <input type="hidden" id="editMedId">
@@ -168,13 +138,13 @@
                                 <label>Days</label>
                                 <div class="day-picker">
                                     <button type="button" class="day-every-btn" id="everyDayBtn">Every day</button>
-                                    <label class="day-btn"><input type="checkbox" value="0"><span>S</span></label>
-                                    <label class="day-btn"><input type="checkbox" value="1"><span>M</span></label>
-                                    <label class="day-btn"><input type="checkbox" value="2"><span>T</span></label>
-                                    <label class="day-btn"><input type="checkbox" value="3"><span>W</span></label>
-                                    <label class="day-btn"><input type="checkbox" value="4"><span>T</span></label>
-                                    <label class="day-btn"><input type="checkbox" value="5"><span>F</span></label>
-                                    <label class="day-btn"><input type="checkbox" value="6"><span>S</span></label>
+                                    <label class="day-btn"><span>S</span><input type="checkbox" value="0"></label>
+                                    <label class="day-btn"><span>M</span><input type="checkbox" value="1"></label>
+                                    <label class="day-btn"><span>T</span><input type="checkbox" value="2"></label>
+                                    <label class="day-btn"><span>W</span><input type="checkbox" value="3"></label>
+                                    <label class="day-btn"><span>T</span><input type="checkbox" value="4"></label>
+                                    <label class="day-btn"><span>F</span><input type="checkbox" value="5"></label>
+                                    <label class="day-btn"><span>S</span><input type="checkbox" value="6"></label>
                                 </div>
                                 <p class="field-hint" id="daysHint">All days selected (every day)</p>
                             </div>
@@ -545,7 +515,6 @@
         </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
     <script src="app.js"></script>
 
         <!-- Copy Fallback Modal (shown on desktop when Web Share API unavailable) -->

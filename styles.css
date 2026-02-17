@@ -820,124 +820,6 @@ body {
     padding: var(--spacing-lg);
 }
 
-/* Camera Section */
-.camera-section {
-    margin-bottom: var(--spacing-lg);
-}
-
-.scan-options {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: var(--spacing-md);
-}
-
-.btn-camera {
-    width: 100%;
-    padding: var(--spacing-lg) var(--spacing-md);
-    border: 2px dashed var(--border);
-    background: var(--gray-50);
-    border-radius: var(--radius-lg);
-    cursor: pointer;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-sm);
-    color: var(--text-secondary);
-    font-family: var(--font-body);
-    font-weight: 500;
-    font-size: 0.9rem;
-    transition: all var(--transition-fast);
-}
-
-.btn-camera:hover {
-    border-color: var(--primary-400);
-    background: var(--primary-50);
-    color: var(--primary-600);
-}
-
-.btn-camera svg {
-    width: 1.75rem;
-    height: 1.75rem;
-}
-
-.btn-camera-photo {
-    border-color: var(--primary-300);
-}
-
-.btn-camera-photo:hover {
-    border-color: var(--primary-500);
-    background: var(--primary-50);
-    color: var(--primary-600);
-}
-
-.btn-camera-file {
-    border-color: var(--gray-300);
-}
-
-/* On desktop, show a note that Take Photo opens file picker */
-.desktop-note {
-    font-size: 0.75rem;
-    color: var(--text-secondary);
-    text-align: center;
-    margin-top: var(--spacing-sm);
-    font-style: italic;
-}
-
-.ocr-status {
-    margin-top: var(--spacing-md);
-    padding: var(--spacing-md);
-    border-radius: var(--radius-md);
-    font-size: 0.875rem;
-    display: none;
-}
-
-.ocr-status.show {
-    display: block;
-}
-
-.ocr-status.processing {
-    background: var(--primary-50);
-    color: var(--primary-600);
-    border: 1px solid var(--primary-400);
-}
-
-.ocr-status.success {
-    background: var(--accent-50);
-    color: var(--accent-600);
-    border: 1px solid var(--accent-500);
-}
-
-.ocr-status.error {
-    background: #fef2f2;
-    color: var(--error);
-    border: 1px solid var(--error);
-}
-
-.divider {
-    text-align: center;
-    position: relative;
-    margin: var(--spacing-lg) 0;
-}
-
-.divider::before {
-    content: '';
-    position: absolute;
-    top: 50%;
-    left: 0;
-    right: 0;
-    height: 1px;
-    background: var(--border);
-}
-
-.divider span {
-    background: var(--bg-primary);
-    padding: 0 var(--spacing-md);
-    position: relative;
-    color: var(--text-secondary);
-    font-size: 0.875rem;
-}
-
 /* Form */
 .form-group {
     margin-bottom: var(--spacing-lg);
@@ -1290,8 +1172,8 @@ body {
 /* Schedule type toggle */
 .schedule-type-toggle {
     display: flex;
-    gap: 0;
-    border: 1px solid var(--border);
+    align-items: stretch;
+    gap: 0.5rem;
     border-radius: var(--radius-md);
     overflow: hidden;
 }
@@ -1299,10 +1181,14 @@ body {
 .schedule-type-btn {
     flex: 1;
     display: flex;
+    align-items: stretch;
+    position: relative;
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
     touch-action: manipulation;
+    font-size: 0;       /* kills inline descender gap on the label element */
+    line-height: 1;
 }
 
 .schedule-type-btn input[type="radio"] {
@@ -1310,6 +1196,7 @@ body {
     opacity: 0;
     width: 0;
     height: 0;
+    pointer-events: none;
 }
 
 .schedule-type-btn span {
@@ -1320,7 +1207,12 @@ body {
     font-weight: 500;
     color: var(--text-secondary);
     background: var(--bg-secondary);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
     transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .schedule-type-btn input:checked + span {
@@ -1361,8 +1253,9 @@ body {
 
 .day-btn {
     display: flex;
+    flex-direction: row;
     align-items: center;
-    justify-content: center;
+    gap: 0.2rem;
     cursor: pointer;
     user-select: none;
     -webkit-tap-highlight-color: transparent;
@@ -1373,26 +1266,24 @@ body {
 .day-btn input[type="checkbox"] {
     appearance: none;
     -webkit-appearance: none;
-    width: 2.1rem;
-    height: 2.1rem;
+    width: 1.6rem;
+    height: 1.6rem;
     border: 2px solid var(--border);
     border-radius: 50%;
     background: var(--bg-primary);
     cursor: pointer;
     transition: all var(--transition-fast);
+    flex-shrink: 0;
 }
 
 .day-btn span {
-    position: absolute;
-    font-size: 0.7rem;
+    font-size: 0.65rem;
     font-weight: 700;
     color: var(--text-secondary);
     pointer-events: none;
     line-height: 1;
-}
-
-.day-btn {
-    position: relative;
+    width: 0.65rem;
+    text-align: center;
 }
 
 .day-btn input[type="checkbox"]:checked {
@@ -1401,7 +1292,7 @@ body {
 }
 
 .day-btn:has(input:checked) span {
-    color: white;
+    color: var(--primary-600);
 }
 
 .field-hint {

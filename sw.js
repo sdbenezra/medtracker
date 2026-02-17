@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medtrack-v4';
+const CACHE_NAME = 'medtrack-v5';
 
 // Use relative paths so the service worker works on any host/subpath
 const urlsToCache = [
@@ -9,8 +9,7 @@ const urlsToCache = [
   './manifest.json',
   './icon-192.png',
   './icon-512.png',
-  'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@600;700&display=swap',
-  'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js'
+  'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=Fraunces:wght@600;700&display=swap'
 ];
 
 // Install event - cache resources

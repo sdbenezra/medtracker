@@ -268,84 +268,6 @@ class MedTrackStorage {
     }
 }
 
-// OCR Handler
-class OCRHandler {
-    constructor(statusElement) {
-        this.statusElement = statusElement;
-    }
-
-    async processImage(file) {
-        this.showStatus('processing', 'Reading medication label...');
-
-        try {
-            const { data: { text } } = await Tesseract.recognize(file, 'eng', {
-                logger: (m) => {
-                    if (m.status === 'recognizing text') {
-                        const progress = Math.round(m.progress * 100);
-                        this.showStatus('processing', `Processing... ${progress}%`);
-                    }
-                }
-            });
-
-            const result = this.extractMedicationInfo(text);
-            
-            if (result.name || result.dosage) {
-                this.showStatus('success', 'Successfully scanned! Review the information below.');
-                return result;
-            } else {
-                this.showStatus('error', 'Could not detect medication information. Please enter manually.');
-                return {};
-            }
-        } catch (error) {
-            this.showStatus('error', 'Error scanning image. Please try again or enter manually.');
-            return {};
-        }
-    }
-
-    extractMedicationInfo(text) {
-        const result = {};
-
-        // Common medication name patterns
-        const lines = text.split('\n').map(line => line.trim()).filter(line => line.length > 0);
-        
-        // Look for dosage patterns (e.g., "10mg", "20 mg", "500mg")
-        const dosagePattern = /(\d+\.?\d*)\s*(mg|mcg|g|ml|units?)/i;
-        for (const line of lines) {
-            const match = line.match(dosagePattern);
-            if (match) {
-                result.dosage = match[0];
-                break;
-            }
-        }
-
-        // Try to find medication name (usually in first few lines, capitalized)
-        for (const line of lines) {
-            // Skip common label words
-            if (line.match(/^(rx|take|medication|drug|warning|prescription|caution|may|use)/i)) {
-                continue;
-            }
-            // Look for capitalized words that might be medication names
-            if (line.match(/^[A-Z][a-zA-Z]+/) && line.length > 3 && line.length < 30) {
-                result.name = line;
-                break;
-            }
-        }
-
-        return result;
-    }
-
-    showStatus(type, message) {
-        this.statusElement.className = `ocr-status show ${type}`;
-        this.statusElement.textContent = message;
-
-        if (type !== 'processing') {
-            setTimeout(() => {
-                this.statusElement.classList.remove('show');
-            }, 5000);
-        }
-    }
-}
-
 // Notification Manager
 class ReminderManager {
     // Check if Web Share API is available (works on iOS Safari, Chrome Android, etc.)
@@ -596,47 +518,6 @@ class MedTrackApp {
 
         // "Add time" button
         on('addTimeBtn', 'click', () => this.addTimeRow());
-
-        // Camera / file scan
-        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        const cameraBtnPhoto = document.getElementById('cameraBtnPhoto');
-        const cameraBtnFile  = document.getElementById('cameraBtnFile');
-        const cameraInput    = document.getElementById('cameraInput');   // has capture="environment"
-        const fileInput      = document.getElementById('fileInput');      // plain file picker
-
-        // On desktop, add a small hint under Take Photo
-        if (!isMobile) {
-            const note = document.createElement('p');
-            note.className = 'desktop-note';
-            note.textContent = 'On desktop this opens a file picker. Use your phone to capture live photos.';
-            document.getElementById('cameraSectionWrapper').appendChild(note);
-        }
-
-        // "Take Photo" — uses capture="environment" so mobile opens camera directly
-        cameraBtnPhoto.addEventListener('click', () => {
-            cameraInput.value = '';
-            cameraInput.click();
-        });
-
-        // "Choose File" — plain file picker on all platforms
-        cameraBtnFile.addEventListener('click', () => {
-            fileInput.value = '';
-            fileInput.click();
-        });
-
-        // Shared OCR handler for both inputs
-        const handleImageFile = async (e) => {
-            const file = e.target.files?.[0];
-            if (!file) return;
-            const ocrStatus = document.getElementById('ocrStatus');
-            const ocr = new OCRHandler(ocrStatus);
-            const result = await ocr.processImage(file);
-            if (result.name)   document.getElementById('medName').value   = result.name;
-            if (result.dosage) document.getElementById('medDosage').value = result.dosage;
-        };
-
-        cameraInput.addEventListener('change', handleImageFile);
-        fileInput.addEventListener('change', handleImageFile);
 
         // Export (click)
         on('exportBtn', 'click', () => {
@@ -1182,8 +1063,6 @@ class MedTrackApp {
         document.getElementById('medicationModalTitle').textContent = 'Edit Medication';
         document.getElementById('medicationSubmitBtn').textContent = 'Save Changes';
         document.getElementById('editMedId').value = med.id;
-        document.getElementById('cameraSectionWrapper').style.display = 'none';
-        document.getElementById('cameraDivider').style.display = 'none';
 
         // Pre-fill fields
         document.getElementById('medName').value = med.name;
@@ -1339,8 +1218,6 @@ class MedTrackApp {
             document.getElementById('editMedId').value = '';
             document.getElementById('medicationModalTitle').textContent = 'Add Medication';
             document.getElementById('medicationSubmitBtn').textContent = 'Add Medication';
-            document.getElementById('cameraSectionWrapper').style.display = '';
-            document.getElementById('cameraDivider').style.display = '';
             // Reset schedule type to Scheduled
             const scheduledRadio = document.querySelector('input[name="scheduleType"][value="scheduled"]');
             if (scheduledRadio) scheduledRadio.checked = true;
@@ -1353,8 +1230,6 @@ class MedTrackApp {
                 this.timeInputsContainer.innerHTML = '';
                 this.addTimeRow('08:00');
             }
-            const ocrStatus = document.getElementById('ocrStatus');
-            if (ocrStatus) ocrStatus.classList.remove('show');
         }
         if (modal === this.addPersonModal) {
             this.personForm.reset();
