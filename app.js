@@ -270,6 +270,10 @@ class MedTrackStorage {
 
 // Notification Manager
 class ReminderManager {
+    constructor(getRecurrenceText) {
+        this.getRecurrenceText = getRecurrenceText;
+    }
+
     // Check if Web Share API is available (works on iOS Safari, Chrome Android, etc.)
     canShare() {
         return navigator.share !== undefined;
@@ -352,7 +356,7 @@ class ReminderManager {
 class MedTrackApp {
     constructor() {
         this.storage = new MedTrackStorage();
-        this.reminders = new ReminderManager();
+        this.reminders = new ReminderManager(this.getRecurrenceText.bind(this));
         this.currentPersonId = null;
         this.people = [];
         this.medications = [];
